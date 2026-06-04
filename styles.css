@@ -1,9 +1,12 @@
 * { box-sizing: border-box; }
 html, body {
-  margin: 0; padding: 0; height: 100%;
+  margin: 0; padding: 0;
+  height: 100%;
+  height: 100dvh;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   font-size: 14px; color: #1f2937; background: #f9fafb;
   -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
 }
 button { font-family: inherit; }
 
@@ -38,6 +41,7 @@ button { font-family: inherit; }
   display: grid;
   grid-template-columns: 340px 1fr;
   height: 100vh;
+  height: 100dvh;
   overflow: hidden;
 }
 #app.with-detail {
@@ -63,6 +67,10 @@ button { font-family: inherit; }
   padding: 4px 10px; font-size: 13px; cursor: pointer;
 }
 .sidebar-actions button:hover { background: #e5e7eb; }
+.phone-only { display: none; }
+@media (max-width: 900px) {
+  .phone-only { display: inline-block; font-size: 18px; line-height: 1; }
+}
 
 .filters { padding: 12px 16px; border-bottom: 1px solid #e5e7eb; display: flex; flex-direction: column; gap: 8px; }
 .filters input, .filters select {
@@ -259,22 +267,49 @@ button { font-family: inherit; }
 @media (max-width: 900px) {
   #app { grid-template-columns: 1fr; grid-template-rows: 1fr; }
   #app.with-detail { grid-template-columns: 1fr; }
+
   #sidebar {
-    position: absolute; inset: 0;
+    position: fixed;
+    left: 0; right: 0; top: 0; bottom: 0;
+    height: 100vh;
+    height: 100dvh;
     z-index: 20;
-    transform: translateY(100%);
-    transition: transform 220ms ease;
+    transform: translateY(105%);
+    transition: transform 240ms ease;
     border-right: none;
+    box-shadow: 0 -8px 24px rgba(0,0,0,0.18);
   }
   #app.sidebar-open #sidebar { transform: translateY(0); }
+
   #detail {
-    position: absolute; inset: 0;
-    z-index: 30; border-left: none;
+    position: fixed;
+    left: 0; right: 0; top: 0; bottom: 0;
+    height: 100vh;
+    height: 100dvh;
+    z-index: 30;
+    border-left: none;
   }
-  .phone-fab { display: flex; align-items: center; justify-content: center; }
-  #legend { right: 8px; bottom: 8px; }
+
+  /* Floating controls — respect iOS safe areas (notch / home indicator) */
+  .phone-fab {
+    display: flex; align-items: center; justify-content: center;
+    top: calc(env(safe-area-inset-top, 0px) + 12px);
+    left: 12px;
+  }
+  #legend {
+    right: 8px;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 8px);
+    font-size: 11px; padding: 8px 10px;
+  }
+
+  /* Inside the sidebar/detail, pad for notch + home indicator */
+  .sidebar-header { padding-top: calc(env(safe-area-inset-top, 0px) + 14px); }
+  #customerList { padding-bottom: env(safe-area-inset-bottom, 0px); }
+  .detail-header { padding-top: calc(env(safe-area-inset-top, 0px) + 8px); }
+  #detailBody { padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 18px); }
+
   .form-grid { grid-template-columns: 1fr; }
   .field-grid { grid-template-columns: 90px 1fr; }
-  .modal { max-height: 92vh; }
+  .modal { max-height: 92vh; max-height: 92dvh; }
   .modal-body { padding: 14px; }
 }

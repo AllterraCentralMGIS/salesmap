@@ -138,6 +138,10 @@ function bindAppUI() {
   document.getElementById('phoneListBtn').addEventListener('click', () => {
     document.getElementById('app').classList.toggle('sidebar-open');
   });
+  const sbClose = document.getElementById('btnSidebarClose');
+  if (sbClose) sbClose.addEventListener('click', () => {
+    document.getElementById('app').classList.remove('sidebar-open');
+  });
 }
 
 // ============== MAP ==============
@@ -220,7 +224,11 @@ function fitMapToCustomers() {
   if (pts.length === 0) return;
   const bounds = new tt.LngLatBounds();
   for (const c of pts) bounds.extend([c.lng, c.lat]);
-  state.map.fitBounds(bounds, { padding: 80, maxZoom: 11 });
+  const isPhone = window.innerWidth < 900;
+  state.map.fitBounds(bounds, {
+    padding: isPhone ? 28 : 80,
+    maxZoom: isPhone ? 12 : 11,
+  });
 }
 
 // ============== DATA LAYER (Supabase) ==============
