@@ -142,6 +142,8 @@ function bindAppUI() {
   if (sbClose) sbClose.addEventListener('click', () => {
     document.getElementById('app').classList.remove('sidebar-open');
   });
+  const recenter = document.getElementById('recenterBtn');
+  if (recenter) recenter.addEventListener('click', () => fitMapToCustomers());
 }
 
 // ============== MAP ==============
@@ -208,7 +210,7 @@ function renderMarkers() {
   state.markers.clear();
   const filtered = applyFilters(state.customers);
   for (const c of filtered) {
-    if (c.lat == null || c.lng == null) continue;
+    if (!isReasonableCoord(c.lat, c.lng)) continue;
     // Two layers: wrap (positioned by TomTom) + inner (gets our scale/shadow without conflict)
     const wrap = document.createElement('div');
     wrap.className = 'sm-pin-wrap';
@@ -225,9 +227,21 @@ function renderMarkers() {
   }
 }
 
+// Sane coordinate guard — anything outside the broader Texas/Gulf Coast box is junk
+// (geocoder fallbacks, 0/0 sentinels, lat/lng swaps that landed in Asia, etc.)
+function isReasonableCoord(lat, lng) {
+  if (lat == null || lng == null) return false;
+  if (!isFinite(lat) || !isFinite(lng)) return false;
+  if (lat === 0 && lng === 0) return false;
+  // Texas + Louisiana + a buffer
+  if (lat < 24 || lat > 37) return false;
+  if (lng < -107 || lng > -88) return false;
+  return true;
+}
+
 function fitMapToCustomers() {
   if (!state.map) return;
-  const pts = state.customers.filter((c) => c.lat != null && c.lng != null);
+  const pts = state.customers.filter((c) => isReasonableCoord(c.lat, c.lng));
   if (pts.length === 0) return;
   const bounds = new tt.LngLatBounds();
   for (const c of pts) bounds.extend([c.lng, c.lat]);
@@ -1014,6 +1028,7 @@ async function runCustomerImport(rows, mapping) {
   }
   showToast(`Imported ${imported} (${geocoded} geocoded, ${reused} unchanged, ${failed} failed, ${skipped} blocked)`, 7000);
   await refreshAll();
+  fitMapToCustomers();
 }
 
 async function importVisitsFlow() {
