@@ -149,9 +149,10 @@ button { font-family: inherit; }
 .sm-pin.selected {
   transform: scale(1.85);
   z-index: 100;
-  border-width: 3px;
+  border: 3px solid #2563eb;
   box-shadow:
-    0 0 0 5px rgba(37, 99, 235, 0.35),
+    0 0 0 4px #2563eb,
+    0 0 0 8px rgba(37, 99, 235, 0.35),
     0 4px 14px rgba(0, 0, 0, 0.55);
   animation: pinPulse 1.4s ease-in-out infinite;
 }
@@ -159,12 +160,14 @@ button { font-family: inherit; }
 @keyframes pinPulse {
   0%, 100% {
     box-shadow:
-      0 0 0 5px rgba(37, 99, 235, 0.35),
+      0 0 0 4px #2563eb,
+      0 0 0 8px rgba(37, 99, 235, 0.35),
       0 4px 14px rgba(0, 0, 0, 0.55);
   }
   50% {
     box-shadow:
-      0 0 0 10px rgba(37, 99, 235, 0.15),
+      0 0 0 4px #2563eb,
+      0 0 0 14px rgba(37, 99, 235, 0.18),
       0 4px 14px rgba(0, 0, 0, 0.55);
   }
 }
