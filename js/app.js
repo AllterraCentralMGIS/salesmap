@@ -232,13 +232,34 @@ function fitMapToCustomers() {
 }
 
 // ============== DATA LAYER (Supabase) ==============
+// PostgREST caps each response at 1000 rows by default. Fetch in pages until done.
+async function fetchAll(builder) {
+  const PAGE = 1000;
+  let from = 0;
+  let out = [];
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const { data, error } = await builder().range(from, from + PAGE - 1);
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    out = out.concat(data);
+    if (data.length < PAGE) break;
+    from += PAGE;
+  }
+  return out;
+}
+
 async function refreshAll() {
-  const [{ data: customers }, { data: zones }, { data: profiles }, { data: visitsAgg }] = await Promise.all([
-    sb.from('customers').select('*').order('company', { ascending: true }),
-    sb.from('zones').select('*').order('name', { ascending: true }),
-    sb.from('profiles').select('id, display_name, salesperson_code'),
-    sb.from('visits').select('customer_id, visit_date'),
+  const [allCustomers, allZones, allProfiles, allVisits] = await Promise.all([
+    fetchAll(() => sb.from('customers').select('*').order('company', { ascending: true })),
+    fetchAll(() => sb.from('zones').select('*').order('name', { ascending: true })),
+    fetchAll(() => sb.from('profiles').select('id, display_name, salesperson_code')),
+    fetchAll(() => sb.from('visits').select('customer_id, visit_date')),
   ]);
+  const customers = allCustomers;
+  const zones = allZones;
+  const profiles = allProfiles;
+  const visitsAgg = allVisits;
   // Compute per-customer last_visit_date and visit_count
   const lastByCust = new Map();
   const countByCust = new Map();
@@ -916,8 +937,8 @@ async function runCustomerImport(rows, mapping) {
   let imported = 0, geocoded = 0, reused = 0, failed = 0, skipped = 0;
   const geocodeCache = new Map();
 
-  // Pre-fetch existing customers for change-detection
-  const { data: existingAll } = await sb.from('customers').select('id, customer_no, company, contact_name, address, city, state, post_code, lat, lng');
+  // Pre-fetch existing customers for change-detection (paginated past the 1000-row cap)
+  const existingAll = await fetchAll(() => sb.from('customers').select('id, customer_no, company, contact_name, address, city, state, post_code, lat, lng'));
   const byNo = new Map(); const byTriple = new Map();
   for (const e of (existingAll || [])) {
     if (e.customer_no) byNo.set(e.customer_no, e);
@@ -1010,8 +1031,8 @@ async function importVisitsFlow() {
 }
 
 async function runVisitImport(rows, mapping) {
-  // Pre-fetch customers for matching
-  const { data: customers } = await sb.from('customers').select('id, customer_no, company, contact_name');
+  // Pre-fetch customers for matching (paginated past the 1000-row cap)
+  const customers = await fetchAll(() => sb.from('customers').select('id, customer_no, company, contact_name'));
   const byNo = new Map(); const byCC = new Map(); const byCompany = new Map();
   for (const c of (customers || [])) {
     if (c.customer_no) byNo.set(String(c.customer_no), c.id);
