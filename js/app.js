@@ -30,6 +30,27 @@ window.addEventListener('unhandledrejection', (e) => {
   showToast(`Error: ${msg}`, 5000);
 });
 
+// ============== THEME ==============
+function resolveTheme(pref) {
+  if (pref === 'light' || pref === 'dark') return pref;
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+function applyTheme(pref) {
+  document.documentElement.setAttribute('data-theme', resolveTheme(pref));
+}
+function tomtomStyleFor(theme) {
+  return theme === 'dark'
+    ? 'tomtom://vector/1/basic-night'
+    : 'tomtom://vector/1/basic-main';
+}
+applyTheme(localStorage.getItem('theme') || 'auto');
+// Live-update if user changes their OS theme while on 'auto'
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+  if ((localStorage.getItem('theme') || 'auto') === 'auto') {
+    applyTheme('auto');
+  }
+});
+
 document.addEventListener('DOMContentLoaded', async () => {
   bindAuthUI();
   const { data: { session } } = await sb.auth.getSession();
@@ -149,9 +170,11 @@ function bindAppUI() {
 // ============== MAP ==============
 async function initMap() {
   if (typeof tt === 'undefined') throw new Error('TomTom SDK did not load');
+  const theme = resolveTheme(localStorage.getItem('theme') || 'auto');
   state.map = tt.map({
     key: state.tomtomKey,
     container: 'map',
+    style: tomtomStyleFor(theme),
     center: CFG.MAP_CENTER,
     zoom: CFG.MAP_ZOOM,
   });
@@ -698,6 +721,15 @@ function openSettings(firstRun) {
     </div>
     <div style="font-size:12px;color:#6b7280;">Get a free key at developer.tomtom.com — Maps + Search products.</div>
 
+    <div class="form-row" style="margin-top:14px;">
+      <label>Theme</label>
+      <select id="sTheme">
+        <option value="auto">Auto (match system)</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+      </select>
+    </div>
+
     <div class="detail-section">
       <h3>Import data</h3>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
@@ -717,7 +749,9 @@ function openSettings(firstRun) {
     const key = getVal('sKey') || '';
     const name = getVal('sName');
     const code = getVal('sCode');
+    const theme = document.getElementById('sTheme').value || 'auto';
     localStorage.setItem('tomtom_api_key', key);
+    localStorage.setItem('theme', theme);
     state.tomtomKey = key;
     await sb.from('profiles').update({ display_name: name || state.profile.display_name, salesperson_code: code }).eq('id', state.user.id);
     const { data: prof } = await sb.from('profiles').select('*').eq('id', state.user.id).single();
@@ -726,6 +760,10 @@ function openSettings(firstRun) {
     showToast('Saved. Reloading…', 1200);
     setTimeout(() => location.reload(), 800);
   });
+
+  // Pre-select current theme
+  const themeSel = document.getElementById('sTheme');
+  if (themeSel) themeSel.value = localStorage.getItem('theme') || 'auto';
 
   document.getElementById('sImportCustomers').addEventListener('click', () => { closeModal(); importCustomersFlow(); });
   document.getElementById('sImportVisits').addEventListener('click', () => { closeModal(); importVisitsFlow(); });
