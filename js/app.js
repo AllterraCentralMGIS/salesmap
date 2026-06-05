@@ -38,11 +38,9 @@ function resolveTheme(pref) {
 function applyTheme(pref) {
   document.documentElement.setAttribute('data-theme', resolveTheme(pref));
 }
-function tomtomStyleFor(theme) {
-  return theme === 'dark'
-    ? 'tomtom://vector/1/basic-night'
-    : 'tomtom://vector/1/basic-main';
-}
+// Note: TomTom v6 SDK doesn't reliably accept a dark style URL across regions.
+// For dark mode we keep the default light map tiles and only darken the UI.
+// That matches Google Maps/Strava etc. and avoids the "style load failed" error.
 applyTheme(localStorage.getItem('theme') || 'auto');
 // Live-update if user changes their OS theme while on 'auto'
 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
@@ -170,11 +168,9 @@ function bindAppUI() {
 // ============== MAP ==============
 async function initMap() {
   if (typeof tt === 'undefined') throw new Error('TomTom SDK did not load');
-  const theme = resolveTheme(localStorage.getItem('theme') || 'auto');
   state.map = tt.map({
     key: state.tomtomKey,
     container: 'map',
-    style: tomtomStyleFor(theme),
     center: CFG.MAP_CENTER,
     zoom: CFG.MAP_ZOOM,
   });
