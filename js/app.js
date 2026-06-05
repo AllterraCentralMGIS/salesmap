@@ -209,11 +209,18 @@ function renderMarkers() {
   const filtered = applyFilters(state.customers);
   for (const c of filtered) {
     if (c.lat == null || c.lng == null) continue;
-    const el = document.createElement('div');
-    el.className = `sm-pin ${recencyBucket(c.last_visit_date)}`;
-    if (c.id === state.selectedId) el.classList.add('selected');
-    el.addEventListener('click', (e) => { e.stopPropagation(); selectCustomer(c.id, false); });
-    const marker = new tt.Marker({ element: el }).setLngLat([c.lng, c.lat]).addTo(state.map);
+    // Two layers: wrap (positioned by TomTom) + inner (gets our scale/shadow without conflict)
+    const wrap = document.createElement('div');
+    wrap.className = 'sm-pin-wrap';
+    const inner = document.createElement('div');
+    inner.className = `sm-pin ${recencyBucket(c.last_visit_date)}`;
+    if (c.id === state.selectedId) {
+      inner.classList.add('selected');
+      wrap.classList.add('selected-wrap');
+    }
+    wrap.appendChild(inner);
+    wrap.addEventListener('click', (e) => { e.stopPropagation(); selectCustomer(c.id, false); });
+    const marker = new tt.Marker({ element: wrap }).setLngLat([c.lng, c.lat]).addTo(state.map);
     state.markers.set(c.id, marker);
   }
 }
