@@ -227,15 +227,14 @@ function renderMarkers() {
   }
 }
 
-// Sane coordinate guard — anything outside the broader Texas/Gulf Coast box is junk
-// (geocoder fallbacks, 0/0 sentinels, lat/lng swaps that landed in Asia, etc.)
+// Sanity guard — null, NaN, 0/0 sentinels, or coordinates outside planet Earth.
+// We do NOT restrict by region — customers can be anywhere.
 function isReasonableCoord(lat, lng) {
   if (lat == null || lng == null) return false;
   if (!isFinite(lat) || !isFinite(lng)) return false;
   if (lat === 0 && lng === 0) return false;
-  // Texas + Louisiana + a buffer
-  if (lat < 24 || lat > 37) return false;
-  if (lng < -107 || lng > -88) return false;
+  if (lat < -90 || lat > 90) return false;
+  if (lng < -180 || lng > 180) return false;
   return true;
 }
 
