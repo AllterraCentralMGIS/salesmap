@@ -129,12 +129,35 @@ button { font-family: inherit; }
   border: 2px solid white;
   box-shadow: 0 1px 3px rgba(0,0,0,0.4);
   cursor: pointer;
+  transition: transform 160ms ease, box-shadow 160ms ease, border-width 160ms ease;
 }
 .sm-pin.never { background: #dc2626; }
 .sm-pin.stale { background: #f59e0b; }
 .sm-pin.mid { background: #facc15; }
 .sm-pin.fresh { background: #16a34a; }
-.sm-pin.selected { transform: scale(1.4); z-index: 10; }
+
+.sm-pin.selected {
+  transform: scale(1.85);
+  z-index: 100;
+  border-width: 3px;
+  box-shadow:
+    0 0 0 5px rgba(37, 99, 235, 0.35),
+    0 4px 14px rgba(0, 0, 0, 0.55);
+  animation: pinPulse 1.4s ease-in-out infinite;
+}
+
+@keyframes pinPulse {
+  0%, 100% {
+    box-shadow:
+      0 0 0 5px rgba(37, 99, 235, 0.35),
+      0 4px 14px rgba(0, 0, 0, 0.55);
+  }
+  50% {
+    box-shadow:
+      0 0 0 10px rgba(37, 99, 235, 0.15),
+      0 4px 14px rgba(0, 0, 0, 0.55);
+  }
+}
 
 .phone-fab {
   position: absolute; left: 16px; top: 16px;
