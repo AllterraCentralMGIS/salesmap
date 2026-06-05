@@ -27,6 +27,9 @@ window.addEventListener('error', (e) => {
 window.addEventListener('unhandledrejection', (e) => {
   console.error('Unhandled rejection:', e.reason);
   const msg = e.reason && e.reason.message ? e.reason.message : String(e.reason);
+  // Suppress the generic "Load failed" fetch noise from TomTom internal retries —
+  // the map's own error handler will surface anything real
+  if (msg === 'Load failed' || msg === 'TypeError: Load failed') return;
   showToast(`Error: ${msg}`, 5000);
 });
 
