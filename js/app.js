@@ -189,10 +189,6 @@ async function initMap() {
     renderMarkers();
     // Don't auto-fit on initial load — start centered on Houston per config
   });
-  state.map.on('zoomend', () => {
-    const z = state.map.getZoom();
-    document.getElementById('map').classList.toggle('show-labels', z >= 12);
-  });
   state.map.on('error', (e) => {
     console.error('Map error:', e && e.error);
     if (e && e.error && e.error.status === 403) {
@@ -247,12 +243,6 @@ function renderMarkers() {
     el.className = `sm-pin ${recencyBucket(c.last_visit_date)}`;
     if (c.id === state.selectedId) el.classList.add('selected');
     el.addEventListener('click', (e) => { e.stopPropagation(); selectCustomer(c.id, false); });
-    if (c.company) {
-      const label = document.createElement('span');
-      label.className = 'sm-label';
-      label.textContent = c.company;
-      el.appendChild(label);
-    }
     const marker = new tt.Marker({ element: el }).setLngLat([c.lng, c.lat]).addTo(state.map);
     state.markers.set(c.id, marker);
   }
