@@ -330,15 +330,34 @@ button { font-family: inherit; }
     border-left: none;
   }
 
-  /* Floating controls — respect iOS safe areas (notch / home indicator) */
+  /* Floating controls — respect iOS safe areas, with minimum offsets so
+     they always clear the status bar / dynamic island */
   .phone-fab {
     display: flex; align-items: center; justify-content: center;
-    top: calc(env(safe-area-inset-top, 0px) + 12px);
-    left: 12px;
+    top: max(calc(env(safe-area-inset-top, 0px) + 12px), 60px);
+    left: max(calc(env(safe-area-inset-left, 0px) + 12px), 12px);
+  }
+  .recenter-fab {
+    /* Move to bottom-left on phones — top-right collides with TomTom +/- */
+    top: auto;
+    right: auto;
+    left: max(calc(env(safe-area-inset-left, 0px) + 12px), 12px);
+    bottom: max(calc(env(safe-area-inset-bottom, 0px) + 80px), 90px);
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    background: #1f2937; color: white;
+    font-size: 18px;
+    border: none;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+  }
+  /* TomTom NavigationControl (mapboxgl-based) — push it inside the safe area */
+  .mapboxgl-ctrl-top-right {
+    top: max(calc(env(safe-area-inset-top, 0px) + 8px), 56px) !important;
+    right: max(calc(env(safe-area-inset-right, 0px) + 8px), 8px) !important;
   }
   #legend {
-    right: 8px;
-    bottom: calc(env(safe-area-inset-bottom, 0px) + 8px);
+    right: max(calc(env(safe-area-inset-right, 0px) + 8px), 8px);
+    bottom: max(calc(env(safe-area-inset-bottom, 0px) + 8px), 8px);
     font-size: 11px; padding: 8px 10px;
   }
 
