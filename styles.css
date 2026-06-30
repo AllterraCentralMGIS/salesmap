@@ -96,8 +96,13 @@ button { font-family: inherit; }
   font-size: 12px; color: #4b5563;
   cursor: pointer; user-select: none;
   padding: 2px 0;
+  min-width: 0;
 }
-.viewport-toggle input { margin: 0; cursor: pointer; accent-color: #2563eb; }
+.viewport-toggle input {
+  margin: 0; cursor: pointer; accent-color: #2563eb;
+  flex-shrink: 0;
+}
+.viewport-toggle span { min-width: 0; flex: 1; }
 
 .counts { font-size: 12px; color: #6b7280; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .counts-delete {
