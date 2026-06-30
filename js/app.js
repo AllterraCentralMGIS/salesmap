@@ -178,10 +178,20 @@ async function initMap() {
     zoom: CFG.MAP_ZOOM,
   });
   state.map.addControl(new tt.NavigationControl());
+  // "Locate me" button — shows your live position with a moving dot
+  state.map.addControl(new tt.GeolocateControl({
+    positionOptions: { enableHighAccuracy: true },
+    trackUserLocation: true,
+    showUserHeading: true,
+  }));
   state.map.on('load', () => {
     renderZonePolygons();
     renderMarkers();
-    fitMapToCustomers();
+    // Don't auto-fit on initial load — start centered on Houston per config
+  });
+  state.map.on('zoomend', () => {
+    const z = state.map.getZoom();
+    document.getElementById('map').classList.toggle('show-labels', z >= 12);
   });
   state.map.on('error', (e) => {
     console.error('Map error:', e && e.error);
@@ -237,6 +247,12 @@ function renderMarkers() {
     el.className = `sm-pin ${recencyBucket(c.last_visit_date)}`;
     if (c.id === state.selectedId) el.classList.add('selected');
     el.addEventListener('click', (e) => { e.stopPropagation(); selectCustomer(c.id, false); });
+    if (c.company) {
+      const label = document.createElement('span');
+      label.className = 'sm-label';
+      label.textContent = c.company;
+      el.appendChild(label);
+    }
     const marker = new tt.Marker({ element: el }).setLngLat([c.lng, c.lat]).addTo(state.map);
     state.markers.set(c.id, marker);
   }
@@ -568,6 +584,9 @@ function openVisitForm(customerId) {
       <label>Outcome</label>
       <select id="vOutcome">
         <option value="">(none)</option>
+        <option>Routine check in</option>
+        <option>Training</option>
+        <option>Delivery</option>
         <option>Met with decision-maker</option>
         <option>Met with gatekeeper</option>
         <option>Decision-maker not in</option>
