@@ -10,7 +10,7 @@
   <link rel="icon" type="image/svg+xml" href="icons/icon.svg" />
   <link rel="apple-touch-icon" href="icons/icon-192.png" />
   <link rel="stylesheet" href="https://api.tomtom.com/maps-sdk-for-web/cdn/6.x/6.25.0/maps/maps.css" />
-  <link rel="stylesheet" href="styles.css?v=8" />
+  <link rel="stylesheet" href="styles.css?v=9" />
 </head>
 <body>
   <!-- Auth gate -->
@@ -69,6 +69,10 @@
             <option value="">All visitors</option>
           </select>
         </div>
+        <label class="viewport-toggle">
+          <input type="checkbox" id="filterViewport" />
+          <span>Only show customers on map</span>
+        </label>
         <div class="counts" id="counts"></div>
       </div>
 
@@ -112,8 +116,8 @@
   <script src="https://cdn.jsdelivr.net/npm/@turf/turf@7.2.0/turf.min.js"></script>
 
   <!-- App -->
-  <script src="config.js?v=7"></script>
-  <script src="js/app.js?v=7"></script>
+  <script src="config.js?v=9"></script>
+  <script src="js/app.js?v=9"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {

@@ -15,7 +15,7 @@ const state = {
   markers: new Map(),
   zoneLayers: [],
   map: null,
-  filters: { q: '', zoneId: '', salesperson: '', recency: '', visitor: '' },
+  filters: { q: '', zoneId: '', salesperson: '', recency: '', visitor: '', viewport: false },
   tomtomKey: null,
 };
 
@@ -153,6 +153,10 @@ function bindAppUI() {
   document.getElementById('filterVisitor').addEventListener('change', (e) => {
     state.filters.visitor = e.target.value; renderList(); renderMarkers();
   });
+  document.getElementById('filterViewport').addEventListener('change', (e) => {
+    state.filters.viewport = e.target.checked;
+    renderList();
+  });
   document.getElementById('btnNewCustomer').addEventListener('click', () => openCustomerForm(null));
   document.getElementById('btnSettings').addEventListener('click', () => openSettings(false));
   document.getElementById('btnSignOut').addEventListener('click', async () => { await sb.auth.signOut(); });
@@ -188,6 +192,10 @@ async function initMap() {
     renderZonePolygons();
     renderMarkers();
     // Don't auto-fit on initial load — start centered on Houston per config
+  });
+  // Refresh the sidebar list when panning/zooming if viewport-filter is on
+  state.map.on('moveend', () => {
+    if (state.filters.viewport) renderList();
   });
   state.map.on('error', (e) => {
     console.error('Map error:', e && e.error);
@@ -383,8 +391,19 @@ function populateVisitorFilter() {
 }
 
 function applyFilters(items) {
-  const { q, zoneId, salesperson, recency, visitor } = state.filters;
+  const { q, zoneId, salesperson, recency, visitor, viewport } = state.filters;
+  // Compute viewport bounds once (not per-customer)
+  let vb = null;
+  if (viewport && state.map) {
+    const b = state.map.getBounds();
+    vb = { n: b.getNorth(), s: b.getSouth(), e: b.getEast(), w: b.getWest() };
+  }
   return items.filter((c) => {
+    if (vb) {
+      if (c.lat == null || c.lng == null) return false;
+      if (c.lat > vb.n || c.lat < vb.s) return false;
+      if (c.lng > vb.e || c.lng < vb.w) return false;
+    }
     if (q) {
       const hay = `${c.company || ''} ${c.contact_name || ''} ${c.city || ''} ${c.address || ''}`.toLowerCase();
       if (!hay.includes(q)) return false;
@@ -412,7 +431,7 @@ function applyFilters(items) {
 // ============== LIST ==============
 function filtersActive() {
   const f = state.filters;
-  return !!(f.q || f.zoneId || f.salesperson || f.recency || f.visitor);
+  return !!(f.q || f.zoneId || f.salesperson || f.recency || f.visitor || f.viewport);
 }
 
 async function deleteFiltered() {

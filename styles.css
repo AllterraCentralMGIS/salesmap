@@ -91,6 +91,14 @@ button { font-family: inherit; }
 }
 .filter-row { display: flex; gap: 6px; }
 .filter-row select { flex: 1; min-width: 0; }
+.viewport-toggle {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12px; color: #4b5563;
+  cursor: pointer; user-select: none;
+  padding: 2px 0;
+}
+.viewport-toggle input { margin: 0; cursor: pointer; accent-color: #2563eb; }
+
 .counts { font-size: 12px; color: #6b7280; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .counts-delete {
   font-size: 11px; padding: 2px 8px; border-radius: 6px;
@@ -354,17 +362,11 @@ button { font-family: inherit; }
     left: max(calc(env(safe-area-inset-left, 0px) + 12px), 12px);
   }
   .recenter-fab {
-    /* Move to bottom-left on phones — top-right collides with TomTom +/- */
-    top: auto;
-    right: auto;
-    left: max(calc(env(safe-area-inset-left, 0px) + 12px), 12px);
-    bottom: max(calc(env(safe-area-inset-bottom, 0px) + 80px), 90px);
-    width: 44px; height: 44px;
-    border-radius: 50%;
-    background: #1f2937; color: white;
-    font-size: 18px;
-    border: none;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+    /* Top-right, stacked BELOW TomTom's nav + locate stack (~180px tall) */
+    top: max(calc(env(safe-area-inset-top, 0px) + 220px), 240px);
+    right: max(calc(env(safe-area-inset-right, 0px) + 8px), 8px);
+    left: auto;
+    bottom: auto;
   }
   /* TomTom NavigationControl (mapboxgl-based) — push it inside the safe area */
   .mapboxgl-ctrl-top-right {
@@ -415,6 +417,7 @@ button { font-family: inherit; }
 }
 [data-theme="dark"] .filters input::placeholder { color: #64748b; }
 [data-theme="dark"] .counts { color: #94a3b8; }
+[data-theme="dark"] .viewport-toggle { color: #cbd5e1; }
 
 [data-theme="dark"] #customerList li { border-bottom-color: #1e293b; }
 [data-theme="dark"] #customerList li:hover { background: #273449; }
