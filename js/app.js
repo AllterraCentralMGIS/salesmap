@@ -907,7 +907,12 @@ async function pickFile(accept) {
   return new Promise((resolve) => {
     const input = document.createElement('input');
     input.type = 'file'; input.accept = accept;
-    input.addEventListener('change', () => resolve(input.files[0] || null));
+    // Safari won't fire change on an input that isn't in the document
+    input.style.display = 'none';
+    document.body.appendChild(input);
+    const finish = (file) => { input.remove(); resolve(file); };
+    input.addEventListener('change', () => finish(input.files[0] || null));
+    input.addEventListener('cancel', () => finish(null));
     input.click();
   });
 }
@@ -1012,7 +1017,7 @@ async function importCustomersFlow() {
 }
 
 async function runCustomerImport(rows, mapping) {
-  let imported = 0, geocoded = 0, reused = 0, failed = 0, skipped = 0;
+  let imported = 0, geocoded = 0, reused = 0, failed = 0, skipped = 0, saveFailed = 0;
   const geocodeCache = new Map();
 
   // Pre-fetch existing customers for change-detection (paginated past the 1000-row cap)
@@ -1048,7 +1053,8 @@ async function runCustomerImport(rows, mapping) {
       // Update text fields only; preserve lat/lng/zone
       const upd = { ...data };
       delete upd.lat; delete upd.lng;
-      await sb.from('customers').update(upd).eq('id', existing.id);
+      const { error: updErr } = await sb.from('customers').update(upd).eq('id', existing.id);
+      if (updErr) { saveFailed++; continue; }
       reused++; imported++;
       showToast(`(${i + 1}/${rows.length}) unchanged: ${data.company || ''}`, 0);
       continue;
@@ -1075,15 +1081,17 @@ async function runCustomerImport(rows, mapping) {
     }
 
     if (existing) {
-      await sb.from('customers').update(data).eq('id', existing.id);
+      const { error: updErr } = await sb.from('customers').update(data).eq('id', existing.id);
+      if (updErr) { saveFailed++; continue; }
     } else {
       data.created_by = state.user.id;
-      const { data: ins } = await sb.from('customers').insert(data).select('id').single();
+      const { data: ins, error: insErr } = await sb.from('customers').insert(data).select('id').single();
+      if (insErr) { saveFailed++; continue; }
       if (ins && data.customer_no) byNo.set(data.customer_no, { ...data, id: ins.id });
     }
     imported++;
   }
-  showToast(`Imported ${imported} (${geocoded} geocoded, ${reused} unchanged, ${failed} failed, ${skipped} blocked)`, 7000);
+  showToast(`Imported ${imported} (${geocoded} geocoded, ${reused} unchanged, ${failed} failed, ${skipped} blocked${saveFailed ? `, ${saveFailed} NOT SAVED` : ''})`, saveFailed ? 0 : 7000);
   await refreshAll();
   fitMapToCustomers();
 }
