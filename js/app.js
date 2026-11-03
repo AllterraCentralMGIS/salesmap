@@ -17,7 +17,7 @@ const state = {
   customers: [],
   zones: [],
   selectedId: null,
-  markers: new Map(),
+  selectedMarker: null,
   zoneLayers: [],
   map: null,
   filters: { q: '', zoneId: '', salesperson: '', recency: '', visitor: '', viewport: false },
@@ -200,6 +200,13 @@ async function onSignedIn(user) {
     openSettings(true);
   }
   await refreshAll();
+  // First view is the rep's own customers; "All salespeople" is one tap away
+  const myCode = state.profile && state.profile.salesperson_code;
+  if (myCode && state.customers.some((c) => c.salesperson_code === myCode)) {
+    state.filters.salesperson = myCode;
+    document.getElementById('filterSalesperson').value = myCode;
+    renderList();
+  }
   if (state.tomtomKey) await initMap().catch((err) => {
     showMapPlaceholder(`Map failed to load: ${err.message}. Check your API key in Settings.`);
   });
@@ -270,7 +277,7 @@ async function initMap() {
   state.map.on('load', () => {
     renderZonePolygons();
     buildMarkers();
-    // Don't auto-fit on initial load — start centered on Houston per config
+    fitMapToCustomers({ core: true }); // first view: the rep's own customers, outliers left out
   });
   // Refresh the sidebar list when panning/zooming if viewport-filter is on
   const viewportList = debounce(() => { if (state.filters.viewport) renderList(); }, 120);
@@ -306,48 +313,107 @@ function renderZonePolygons() {
   for (const z of state.zones) {
     const sourceId = `zone-${z.id}`;
     state.map.addSource(sourceId, { type: 'geojson', data: z.geojson });
+    const under = state.map.getLayer('clusters') ? 'clusters' : undefined;
     state.map.addLayer({
       id: sourceId, type: 'fill', source: sourceId,
       paint: { 'fill-color': z.color || '#888', 'fill-opacity': 0.12 },
-    });
+    }, under);
     state.map.addLayer({
       id: sourceId + '-outline', type: 'line', source: sourceId,
       paint: { 'line-color': z.color || '#888', 'line-width': 1.5, 'line-opacity': 0.7 },
-    });
+    }, under);
     state.zoneLayers.push(sourceId);
   }
 }
 
-// One marker per customer, built when the data changes. Filtering only shows or
-// hides them; selection toggles a class on two elements. Nothing is rebuilt per keystroke.
+// Customers are a clustered GeoJSON layer drawn by the map, not DOM markers: cheap
+// at 1,650 points, and dense areas merge into counted circles. Only the selected
+// customer gets a DOM pin, so it can carry the gold ring and pulse.
+const PIN_COLORS = { never: '#d93025', stale: '#f08c00', mid: '#e6c400', fresh: '#1f9d55' };
+function customerFeatures(list) {
+  const features = [];
+  for (const c of list) {
+    if (!isReasonableCoord(c.lat, c.lng)) continue;
+    features.push({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [c.lng, c.lat] },
+      properties: { id: c.id, bucket: recencyBucket(c.last_visit_date) },
+    });
+  }
+  return { type: 'FeatureCollection', features };
+}
+// The cluster labels need a font the TomTom style actually serves
+function mapTextFont() {
+  const layers = (state.map.getStyle() || {}).layers || [];
+  const l = layers.find((x) => x.type === 'symbol' && x.layout && x.layout['text-font']);
+  const f = l ? l.layout['text-font'] : null;
+  return Array.isArray(f) && f.length ? f : ['Noto-Regular'];
+}
 function buildMarkers() {
   if (!state.map) return;
-  for (const m of state.markers.values()) m.remove();
-  state.markers.clear();
-  for (const c of state.customers) {
-    if (!isReasonableCoord(c.lat, c.lng)) continue;
-    const el = document.createElement('div');
-    el.className = `sm-pin ${recencyBucket(c.last_visit_date)}`;
-    el.dataset.id = c.id;
-    if (c.id === state.selectedId) el.classList.add('selected');
-    el.addEventListener('click', (e) => { e.stopPropagation(); selectCustomer(c.id, false); });
-    const marker = new tt.Marker({ element: el }).setLngLat([c.lng, c.lat]).addTo(state.map);
-    state.markers.set(c.id, marker);
+  const data = customerFeatures(applyFilters(state.customers));
+  const src = state.map.getSource('customers');
+  if (src) { src.setData(data); setSelectedPin(null, state.selectedId); return; }
+  try {
+    state.map.addSource('customers', { type: 'geojson', data, cluster: true, clusterRadius: 46, clusterMaxZoom: 13 });
+  } catch (e) {
+    // Style not ready yet: try again once it is
+    state.map.once('styledata', buildMarkers);
+    return;
   }
-  renderMarkers();
+  state.map.addLayer({
+    id: 'clusters', type: 'circle', source: 'customers', filter: ['has', 'point_count'],
+    paint: {
+      'circle-color': '#003054',
+      'circle-stroke-color': '#FBAD26', 'circle-stroke-width': 2,
+      'circle-radius': ['step', ['get', 'point_count'], 16, 25, 20, 100, 24, 400, 30],
+    },
+  });
+  state.map.addLayer({
+    id: 'cluster-count', type: 'symbol', source: 'customers', filter: ['has', 'point_count'],
+    layout: { 'text-field': ['get', 'point_count_abbreviated'], 'text-font': mapTextFont(), 'text-size': 13, 'text-allow-overlap': true },
+    paint: { 'text-color': '#ffffff' },
+  });
+  state.map.addLayer({
+    id: 'points', type: 'circle', source: 'customers', filter: ['!', ['has', 'point_count']],
+    paint: {
+      'circle-color': ['match', ['get', 'bucket'], 'stale', PIN_COLORS.stale, 'mid', PIN_COLORS.mid, 'fresh', PIN_COLORS.fresh, PIN_COLORS.never],
+      'circle-radius': 7,
+      'circle-stroke-color': '#ffffff', 'circle-stroke-width': 2,
+    },
+  });
+  state.map.on('click', 'points', (e) => {
+    const f = e.features && e.features[0];
+    if (f) selectCustomer(f.properties.id, false);
+  });
+  state.map.on('click', 'clusters', (e) => {
+    const f = e.features && e.features[0];
+    if (!f) return;
+    state.map.getSource('customers').getClusterExpansionZoom(f.properties.cluster_id, (err, zoom) => {
+      if (err) return;
+      state.map.easeTo({ center: f.geometry.coordinates, zoom: zoom + 0.4 });
+    });
+  });
+  for (const id of ['points', 'clusters']) {
+    state.map.on('mouseenter', id, () => { state.map.getCanvas().style.cursor = 'pointer'; });
+    state.map.on('mouseleave', id, () => { state.map.getCanvas().style.cursor = ''; });
+  }
+  setSelectedPin(null, state.selectedId);
 }
 function renderMarkers() {
   if (!state.map) return;
-  const visible = new Set(applyFilters(state.customers).map((c) => c.id));
-  for (const [id, m] of state.markers) {
-    m.getElement().classList.toggle('hidden', !visible.has(id));
-  }
+  const src = state.map.getSource('customers');
+  if (src) src.setData(customerFeatures(applyFilters(state.customers)));
 }
 function setSelectedPin(prevId, id) {
-  const prev = prevId != null && state.markers.get(prevId);
-  const next = id != null && state.markers.get(id);
-  if (prev) prev.getElement().classList.remove('selected');
-  if (next) next.getElement().classList.add('selected');
+  if (!state.map) return;
+  if (state.selectedMarker) { state.selectedMarker.remove(); state.selectedMarker = null; }
+  const c = id != null ? state.customers.find((x) => x.id === id) : null;
+  if (!c || !isReasonableCoord(c.lat, c.lng)) return;
+  const el = document.createElement('div');
+  el.className = `sm-pin selected ${recencyBucket(c.last_visit_date)}`;
+  el.addEventListener('click', (e) => e.stopPropagation());
+  state.selectedMarker = new tt.Marker({ element: el }).setLngLat([c.lng, c.lat]).addTo(state.map);
 }
 
 // Sanity guard — null, NaN, 0/0 sentinels, or coordinates outside planet Earth.
@@ -361,10 +427,20 @@ function isReasonableCoord(lat, lng) {
   return true;
 }
 
-function fitMapToCustomers() {
+// Fit the map to the customers shown. With `core` set, outliers (customers more than
+// ~150 mi from the median point) are left out so a handful of out-of-state accounts
+// don't zoom the first view out to the whole country.
+function fitMapToCustomers(opts) {
   if (!state.map) return;
-  const pts = state.customers.filter((c) => isReasonableCoord(c.lat, c.lng));
+  let pts = applyFilters(state.customers).filter((c) => isReasonableCoord(c.lat, c.lng));
   if (pts.length === 0) return;
+  if (opts && opts.core && pts.length > 2) {
+    const median = (arr) => { const a = [...arr].sort((x, y) => x - y); return a[Math.floor(a.length / 2)]; };
+    const mLat = median(pts.map((c) => c.lat)), mLng = median(pts.map((c) => c.lng));
+    const cosLat = Math.cos(mLat * Math.PI / 180);
+    const core = pts.filter((c) => Math.hypot((c.lat - mLat) * 69, (c.lng - mLng) * 69 * cosLat) <= 150);
+    if (core.length >= 2) pts = core;
+  }
   const bounds = new tt.LngLatBounds();
   for (const c of pts) bounds.extend([c.lng, c.lat]);
   const isPhone = window.innerWidth < 900;

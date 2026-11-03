@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700;800&display=swap" />
-  <link rel="stylesheet" href="styles.css?v=16" />
+  <link rel="stylesheet" href="styles.css?v=17" />
 </head>
 <body>
   <!-- Icon set: 24px stroke icons, drawn once, used with <use> -->
@@ -123,7 +123,7 @@
 
       <!-- Phone: floating buttons -->
       <button id="phoneListBtn" class="phone-fab" title="Customer list" aria-label="Customer list"><svg class="icon" aria-hidden="true"><use href="#i-list"/></svg></button>
-      <button id="recenterBtn" class="recenter-fab" title="Fit map to all customers" aria-label="Fit map to all customers"><svg class="icon" aria-hidden="true"><use href="#i-fit"/></svg></button>
+      <button id="recenterBtn" class="recenter-fab" title="Fit map to the customers shown" aria-label="Fit map to the customers shown"><svg class="icon" aria-hidden="true"><use href="#i-fit"/></svg></button>
     </main>
 
     <aside id="detail" class="hidden">
@@ -147,7 +147,7 @@
 
   <!-- App -->
   <script src="config.js?v=9"></script>
-  <script src="js/app.js?v=16"></script>
+  <script src="js/app.js?v=17"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
