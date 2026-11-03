@@ -49,10 +49,12 @@ function applyTheme(pref) {
 // Note: TomTom v6 SDK doesn't reliably accept a dark style URL across regions.
 // For dark mode we keep the default light map tiles and only darken the UI.
 // That matches Google Maps/Strava etc. and avoids the "style load failed" error.
-applyTheme(localStorage.getItem('theme') || 'auto');
+// Dark is the default; 'auto' and 'light' are opt-in from Settings.
+const DEFAULT_THEME = 'dark';
+applyTheme(localStorage.getItem('theme') || DEFAULT_THEME);
 // Live-update if user changes their OS theme while on 'auto'
 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
-  if ((localStorage.getItem('theme') || 'auto') === 'auto') {
+  if ((localStorage.getItem('theme') || DEFAULT_THEME) === 'auto') {
     applyTheme('auto');
   }
 });
@@ -825,9 +827,9 @@ function openSettings(firstRun) {
     <div class="form-row mt-4">
       <label for="sTheme">Theme</label>
       <select id="sTheme">
-        <option value="auto">Auto (match system)</option>
-        <option value="light">Light</option>
         <option value="dark">Dark</option>
+        <option value="light">Light</option>
+        <option value="auto">Match system</option>
       </select>
     </div>
 
@@ -858,7 +860,7 @@ function openSettings(firstRun) {
     const key = getVal('sKey') || '';
     const name = getVal('sName');
     const code = getVal('sCode');
-    const theme = document.getElementById('sTheme').value || 'auto';
+    const theme = document.getElementById('sTheme').value || DEFAULT_THEME;
     localStorage.setItem('tomtom_api_key', key);
     localStorage.setItem('theme', theme);
     state.tomtomKey = key;
@@ -872,7 +874,7 @@ function openSettings(firstRun) {
 
   // Pre-select current theme
   const themeSel = document.getElementById('sTheme');
-  if (themeSel) themeSel.value = localStorage.getItem('theme') || 'auto';
+  if (themeSel) themeSel.value = localStorage.getItem('theme') || DEFAULT_THEME;
 
   document.getElementById('sImportCustomers').addEventListener('click', () => { closeModal(); importCustomersFlow(); });
   document.getElementById('sImportVisits').addEventListener('click', () => { closeModal(); importVisitsFlow(); });
