@@ -44,7 +44,10 @@ function resolveTheme(pref) {
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
 function applyTheme(pref) {
-  document.documentElement.setAttribute('data-theme', resolveTheme(pref));
+  const t = resolveTheme(pref);
+  document.documentElement.setAttribute('data-theme', t);
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', t === 'dark' ? '#041422' : '#003054');
 }
 // Note: TomTom v6 SDK doesn't reliably accept a dark style URL across regions.
 // For dark mode we keep the default light map tiles and only darken the UI.
@@ -195,6 +198,7 @@ async function onSignedIn(user) {
   state.profile = prof;
   hideAuthScreen();
   bindAppUI();
+  document.getElementById('counts').textContent = 'Loading customers…';
   state.tomtomKey = localStorage.getItem('tomtom_api_key') || CFG.DEFAULT_TOMTOM_KEY || '';
   if (!state.tomtomKey) {
     openSettings(true);
@@ -477,7 +481,7 @@ async function refreshAll() {
     fetchAll(() => sb.from('customers').select('*').order('company', { ascending: true })),
     fetchAll(() => sb.from('zones').select('*').order('name', { ascending: true })),
     fetchAll(() => sb.from('profiles').select('id, display_name, salesperson_code')),
-    fetchAll(() => sb.from('visits').select('customer_id, visit_date')),
+    fetchAll(() => sb.from('visits').select('customer_id, visit_date, visitor_id')),
   ]);
   const customers = allCustomers;
   const zones = allZones;
@@ -486,8 +490,13 @@ async function refreshAll() {
   // Compute per-customer last_visit_date and visit_count
   const lastByCust = new Map();
   const countByCust = new Map();
+  const visitorsByCust = new Map();
   for (const v of (visitsAgg || [])) {
     countByCust.set(v.customer_id, (countByCust.get(v.customer_id) || 0) + 1);
+    if (v.visitor_id) {
+      if (!visitorsByCust.has(v.customer_id)) visitorsByCust.set(v.customer_id, new Set());
+      visitorsByCust.get(v.customer_id).add(v.visitor_id);
+    }
     const cur = lastByCust.get(v.customer_id);
     if (!cur || v.visit_date > cur) lastByCust.set(v.customer_id, v.visit_date);
   }
@@ -499,6 +508,7 @@ async function refreshAll() {
     zone_color: c.zone_id != null ? (zoneById.get(c.zone_id) || {}).color : null,
     last_visit_date: lastByCust.get(c.id) || null,
     visit_count: countByCust.get(c.id) || 0,
+    _visitorIds: visitorsByCust.get(c.id) || null,
   }));
   state.profilesById = Object.fromEntries((profiles || []).map((p) => [p.id, p]));
   populateZoneFilter();
@@ -615,11 +625,8 @@ function applyFilters(items) {
       if (recency === '30' && (days == null || days < 30)) return false;
       if (recency === 'recent' && (days == null || days >= 30)) return false;
     }
-    // visitor filter would require fetching all visits; approximate by hiding customers without any visit by that visitor.
-    // To keep this simple and fast, ignore unless visitor is set; in that case we'll do a per-customer client check.
     if (visitor) {
-      const v = c._visitorIds; // lazily populated below
-      if (!v || !v.has(visitor)) return false;
+      if (!c._visitorIds || !c._visitorIds.has(visitor)) return false;
     }
     return true;
   });
@@ -649,16 +656,34 @@ function renderList() {
   const ul = document.getElementById('customerList');
   const filtered = applyFilters(state.customers);
   const countsEl = document.getElementById('counts');
-  countsEl.textContent = `${filtered.length} of ${state.customers.length} customers`;
+  countsEl.innerHTML = `<span>${filtered.length} of ${state.customers.length} customers</span>` +
+    (filtersActive() ? `<button class="link-btn" id="btnClearFilters">Clear filters</button>` : '');
+  const clearBtn = document.getElementById('btnClearFilters');
+  if (clearBtn) clearBtn.addEventListener('click', clearFilters);
 
+  if (state.customers.length === 0) {
+    ul.innerHTML = `<li class="static"><div class="empty-state">
+      <p>No customers yet.</p>
+      <div class="btn-row center"><button class="btn btn-primary" id="emptyImport">Import customers</button><button class="btn" id="emptyNew">Add a customer</button></div>
+    </div></li>`;
+    document.getElementById('emptyImport').addEventListener('click', importCustomersFlow);
+    document.getElementById('emptyNew').addEventListener('click', () => openCustomerForm(null));
+    return;
+  }
   if (filtered.length === 0) {
-    ul.innerHTML = '<li><div class="empty-state">No customers match.</div></li>';
+    ul.innerHTML = `<li class="static"><div class="empty-state">
+      <p>No customers match these filters.</p>
+      <div class="btn-row center"><button class="btn" id="emptyClear">Clear filters</button></div>
+    </div></li>`;
+    document.getElementById('emptyClear').addEventListener('click', clearFilters);
     return;
   }
   const frag = document.createDocumentFragment();
   for (const c of filtered) {
     const li = document.createElement('li');
     li.dataset.id = c.id;
+    li.tabIndex = 0;
+    li.setAttribute('role', 'button');
     if (c.id === state.selectedId) li.classList.add('active');
     li.innerHTML = `
       <div class="pin sm-pin ${recencyBucket(c.last_visit_date)}"></div>
@@ -671,14 +696,30 @@ function renderList() {
   }
   ul.replaceChildren(frag);
 }
-// One click handler for the whole list (rows carry data-id)
-document.getElementById('customerList').addEventListener('click', (e) => {
-  const li = e.target.closest('li[data-id]');
-  if (!li) return;
+// One click/keyboard handler for the whole list (rows carry data-id)
+function pickRow(li) {
   selectCustomer(Number(li.dataset.id), true);
   // On phone, close the sidebar overlay when picking
   document.getElementById('app').classList.remove('sidebar-open');
+}
+document.getElementById('customerList').addEventListener('click', (e) => {
+  const li = e.target.closest('li[data-id]');
+  if (li) pickRow(li);
 });
+document.getElementById('customerList').addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  const li = e.target.closest('li[data-id]');
+  if (!li) return;
+  e.preventDefault();
+  pickRow(li);
+});
+function clearFilters() {
+  state.filters = { ...state.filters, q: '', zoneId: '', salesperson: '', recency: '', visitor: '', viewport: false };
+  document.getElementById('search').value = '';
+  for (const id of ['filterZone', 'filterSalesperson', 'filterRecency', 'filterVisitor']) document.getElementById(id).value = '';
+  document.getElementById('filterViewport').checked = false;
+  renderList(); renderMarkers();
+}
 function setSelectedRow(prevId, id) {
   const ul = document.getElementById('customerList');
   if (prevId != null) ul.querySelector(`li[data-id="${prevId}"]`)?.classList.remove('active');
@@ -786,7 +827,7 @@ async function deleteVisit(customerId, visitId) {
 
 // ============== VISIT FORM ==============
 function openVisitForm(customerId) {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = ymdLocal(new Date());
   openModal('Log visit', `
     <div class="form-row"><label for="vDate">Date</label><input type="date" id="vDate" value="${today}" /></div>
     <div class="form-row">
@@ -862,6 +903,7 @@ function openCustomerForm(existing) {
       Address will be geocoded and a zone assigned automatically when you save.
     </div>
   `, async () => {
+    if (!getVal('fCompany')) { showToast('Company is required.', 3000); document.getElementById('fCompany').focus(); return; }
     const data = {
       company: getVal('fCompany'),
       contact_name: getVal('fContact'),
@@ -953,7 +995,7 @@ function openSettings(firstRun) {
     </div>
     <div class="form-row">
       <label for="sKey">TomTom API key</label>
-      <input id="sKey" value="${escapeAttr(state.tomtomKey || '')}" placeholder="Your TomTom API key" />
+      <input id="sKey" type="password" autocomplete="off" value="${escapeAttr(state.tomtomKey || '')}" placeholder="Your TomTom API key" />
     </div>
     <div class="hint">Get a free key at developer.tomtom.com — Maps + Search products.</div>
 
@@ -1105,9 +1147,15 @@ function isBlocked(val) {
   const s = String(val).trim().toLowerCase();
   return ['yes','true','1','x','y','blocked','inactive'].includes(s);
 }
+// YYYY-MM-DD in the browser's local time zone (toISOString would give the UTC date,
+// which is tomorrow after 6 pm Central)
+function ymdLocal(d) {
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
 function parseDateFlexible(v) {
   if (v === undefined || v === null || v === '') return null;
-  if (v instanceof Date && !isNaN(v.getTime())) return v.toISOString().slice(0, 10);
+  if (v instanceof Date && !isNaN(v.getTime())) return ymdLocal(v);
   if (typeof v === 'number') {
     const epoch = new Date(Date.UTC(1899, 11, 30));
     const d = new Date(epoch.getTime() + v * 86400000);
@@ -1115,7 +1163,7 @@ function parseDateFlexible(v) {
     return null;
   }
   const d = new Date(String(v).trim());
-  if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+  if (!isNaN(d.getTime())) return ymdLocal(d);
   return null;
 }
 function jitter(seed) {
@@ -1475,7 +1523,14 @@ function openModal(title, bodyHtml, onSave) {
     </div>`;
   document.getElementById('modalClose').addEventListener('click', closeModal);
   document.getElementById('modalCancel').addEventListener('click', closeModal);
-  document.getElementById('modalSave').addEventListener('click', onSave);
+  const saveBtn = document.getElementById('modalSave');
+  saveBtn.addEventListener('click', async (e) => {
+    if (saveBtn.disabled) return;
+    const label = saveBtn.textContent;
+    saveBtn.disabled = true; saveBtn.textContent = 'Saving…';
+    try { await onSave(e); }
+    finally { if (saveBtn.isConnected) { saveBtn.disabled = false; saveBtn.textContent = label; } }
+  });
   root.querySelector('.modal-overlay').addEventListener('mousedown', (e) => { if (e.target === e.currentTarget) closeModal(); });
   const first = root.querySelector('.modal-body input:not([type=hidden]), .modal-body select, .modal-body textarea, .modal-body button')
     || document.getElementById('modalClose');

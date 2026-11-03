@@ -336,6 +336,11 @@ h1, h2, h3 { color: var(--heading); letter-spacing: -0.01em; }
   transition: background 100ms ease;
 }
 #customerList li:hover { background: var(--surface-2); }
+#customerList li.static { cursor: default; display: block; }
+#customerList li.static:hover { background: var(--surface); }
+.empty-state p { margin: 0 0 var(--s-3); }
+.btn-row.center { justify-content: center; }
+.link-btn { background: none; border: none; padding: 0; color: var(--link); font-size: var(--fs-xs); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
 #customerList li.active { background: var(--tint); }
 #customerList li.active .name { color: var(--tint-text); }
 #customerList .pin {
@@ -400,7 +405,7 @@ h1, h2, h3 { color: var(--heading); letter-spacing: -0.01em; }
 }
 @media (prefers-reduced-motion: reduce) {
   .sm-pin.selected::after { animation: none; display: none; }
-  #sidebar, .btn, .sm-pin, .dropzone { transition: none; }
+  #sidebar, .btn, .sm-pin { transition: none; }
 }
 
 .phone-fab .icon { width: 22px; height: 22px; }
@@ -539,16 +544,6 @@ h1, h2, h3 { color: var(--heading); letter-spacing: -0.01em; }
 .mapping-sample { font-size: var(--fs-xs); color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
 .mapping-cell-select select { min-height: 32px; padding: 4px 8px; font-size: var(--fs-sm); }
 
-/* File drop zone */
-.dropzone {
-  border: 2px dashed var(--border); border-radius: var(--r-md);
-  padding: var(--s-5); text-align: center;
-  color: var(--text-3); font-size: var(--fs-sm);
-  cursor: pointer;
-  transition: border-color 120ms, background 120ms;
-}
-.dropzone:hover, .dropzone.dragover { border-color: var(--at-blue-11); background: var(--tint); color: var(--tint-text); }
-.dropzone input { display: none; }
 
 /* Toast */
 #toast {
@@ -650,6 +645,7 @@ h1, h2, h3 { color: var(--heading); letter-spacing: -0.01em; }
   #detailBody { padding-bottom: 18px; }
   .detail-footer { padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 12px); }
   .detail-footer .btn { min-height: 44px; }
+  .visit-delete { width: 44px; height: 44px; top: 2px; right: 2px; }
 
   .form-grid { grid-template-columns: 1fr; }
   .field-grid { grid-template-columns: 90px 1fr; }
