@@ -371,7 +371,12 @@ function buildMarkers() {
   const src = state.map.getSource('customers');
   if (src) { src.setData(data); setSelectedPin(null, state.selectedId); return; }
   try {
-    state.map.addSource('customers', { type: 'geojson', data, cluster: true, clusterRadius: 46, clusterMaxZoom: 13 });
+    // Pins at metro zoom and closer so every customer's recency colour shows;
+    // clusters only when zoomed out to roughly a whole state or wider.
+    state.map.addSource('customers', {
+      type: 'geojson', data, cluster: true, clusterRadius: 38, clusterMaxZoom: 6,
+      clusterProperties: { overdue: ['+', ['case', ['match', ['get', 'bucket'], ['never', 'stale'], true, false], 1, 0]] },
+    });
   } catch (e) {
     // Style not ready yet: try again once it is
     state.map.once('styledata', buildMarkers);
@@ -380,27 +385,42 @@ function buildMarkers() {
   state.map.addLayer({
     id: 'clusters', type: 'circle', source: 'customers', filter: ['has', 'point_count'],
     paint: {
-      'circle-color': '#003054',
-      'circle-stroke-color': '#FBAD26', 'circle-stroke-width': 2,
-      'circle-radius': ['step', ['get', 'point_count'], 16, 25, 20, 100, 24, 400, 30],
+      // Colour = share of the cluster not visited in 90+ days (never counts as overdue)
+      'circle-color': ['step', ['/', ['get', 'overdue'], ['get', 'point_count']],
+        PIN_COLORS.fresh, 0.3, PIN_COLORS.mid, 0.6, PIN_COLORS.stale, 0.9, PIN_COLORS.never],
+      'circle-stroke-color': '#ffffff', 'circle-stroke-width': 2,
+      'circle-radius': ['step', ['get', 'point_count'], 15, 25, 19, 100, 23, 400, 28],
     },
   });
   state.map.addLayer({
     id: 'cluster-count', type: 'symbol', source: 'customers', filter: ['has', 'point_count'],
     layout: { 'text-field': ['get', 'point_count_abbreviated'], 'text-font': mapTextFont(), 'text-size': 13, 'text-allow-overlap': true },
-    paint: { 'text-color': '#ffffff' },
+    paint: {
+      'text-color': ['step', ['/', ['get', 'overdue'], ['get', 'point_count']], '#ffffff', 0.3, '#3a2c00', 0.6, '#ffffff'],
+    },
   });
   state.map.addLayer({
     id: 'points', type: 'circle', source: 'customers', filter: ['!', ['has', 'point_count']],
     paint: {
       'circle-color': ['match', ['get', 'bucket'], 'stale', PIN_COLORS.stale, 'mid', PIN_COLORS.mid, 'fresh', PIN_COLORS.fresh, PIN_COLORS.never],
-      'circle-radius': 7,
-      'circle-stroke-color': '#ffffff', 'circle-stroke-width': 2,
+      // Small at regional zoom so dense metros stay readable, bigger as you close in
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 6, 3.5, 8, 4.5, 10, 6, 13, 8],
+      'circle-stroke-color': '#ffffff',
+      'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 6, 0.75, 9, 1.5, 12, 2],
     },
+    // Recently visited draw on top so they aren't buried under red
+    layout: { 'circle-sort-key': ['match', ['get', 'bucket'], 'fresh', 3, 'mid', 2, 'stale', 1, 0] },
   });
-  state.map.on('click', 'points', (e) => {
-    const f = e.features && e.features[0];
-    if (f) selectCustomer(f.properties.id, false);
+  // Small pins: hit-test a 22 px box around the tap instead of the dot itself
+  state.map.on('click', (e) => {
+    const r = 11, p = e.point;
+    const hits = state.map.queryRenderedFeatures([[p.x - r, p.y - r], [p.x + r, p.y + r]], { layers: ['points'] });
+    if (!hits.length) return;
+    const nearest = hits.reduce((a, b) => {
+      const da = state.map.project(a.geometry.coordinates), db = state.map.project(b.geometry.coordinates);
+      return Math.hypot(db.x - p.x, db.y - p.y) < Math.hypot(da.x - p.x, da.y - p.y) ? b : a;
+    });
+    selectCustomer(nearest.properties.id, false);
   });
   state.map.on('click', 'clusters', (e) => {
     const f = e.features && e.features[0];
@@ -1628,30 +1648,94 @@ function hideToast() { document.getElementById('toast').classList.add('hidden');
 function isPhone() { return window.matchMedia('(max-width: 900px)').matches; }
 function setSheet(el, st) { el.dataset.sheet = st; el.style.height = ''; }
 const SHEET_ORDER = ['peek', 'half', 'full'];
+// Phone sheets follow the finger. A drag can start anywhere on the sheet: on the
+// handle and the top block it always moves the sheet; inside the scrolling list
+// or card it moves the sheet only when that content is scrolled to the top (drag
+// down) or the sheet can still grow (drag up). A flick snaps one step in its
+// direction; a slow drag snaps to the nearest height. Flicking the card down
+// from its lowest height closes it.
+function sheetRestHeights(el) {
+  const vh = window.innerHeight;
+  const peek = el.id === 'detail' ? 150 : 172;
+  return { peek, half: vh * (el.id === 'detail' ? 0.62 : 0.56), full: vh - 8 };
+}
 function sheetDrag(handle, el) {
   if (!handle) return;
-  let startY = 0, startH = 0, dragging = false;
-  handle.addEventListener('pointerdown', (e) => {
+  let g = null; // current gesture
+  let swallowClick = false;
+  const scrollerOf = (t) => t.closest('#customerList, #detailBody');
+  const start = (y, target) => {
     if (!isPhone()) return;
-    dragging = true; startY = e.clientY; startH = el.getBoundingClientRect().height;
-    el.classList.add('dragging');
-    handle.setPointerCapture(e.pointerId);
-  });
-  handle.addEventListener('pointermove', (e) => {
-    if (!dragging) return;
-    const h = Math.max(80, Math.min(window.innerHeight, startH + (startY - e.clientY)));
-    el.style.height = h + 'px';
-  });
-  const end = (e) => {
-    if (!dragging) return;
-    dragging = false; el.classList.remove('dragging');
-    const tapped = Math.abs(e.clientY - startY) < 6;
-    if (tapped) { cycleSheet(el); return; }
-    const h = el.getBoundingClientRect().height, vh = window.innerHeight;
-    setSheet(el, h < vh * 0.35 ? 'peek' : h < vh * 0.8 ? 'half' : 'full');
+    if (target.closest('input, select, textarea')) return; // let fields focus normally
+    g = { y0: y, h0: el.getBoundingClientRect().height, scroller: scrollerOf(target), mode: 'pending', samples: [[y, performance.now()]] };
   };
-  handle.addEventListener('pointerup', end);
-  handle.addEventListener('pointercancel', end);
+  const move = (y, e) => {
+    if (!g) return;
+    const dy = g.y0 - y; // + = finger moved up
+    if (g.mode === 'pending') {
+      if (Math.abs(dy) < 8) return;
+      if (g.scroller) {
+        const atTop = g.scroller.scrollTop <= 0;
+        const canGrow = el.dataset.sheet !== 'full';
+        if (!((dy < 0 && atTop) || (dy > 0 && canGrow))) { g.mode = 'scroll'; return; }
+      }
+      g.mode = 'drag';
+      el.classList.add('dragging');
+    }
+    if (g.mode !== 'drag') return;
+    if (e && e.cancelable) e.preventDefault();
+    const h = Math.max(60, Math.min(window.innerHeight - 8, g.h0 + dy));
+    el.style.height = h + 'px';
+    g.samples.push([y, performance.now()]);
+    if (g.samples.length > 6) g.samples.shift();
+  };
+  const end = (y) => {
+    if (!g) return;
+    const gesture = g; g = null;
+    if (gesture.mode !== 'drag') return;
+    el.classList.remove('dragging');
+    swallowClick = true; setTimeout(() => { swallowClick = false; }, 350);
+    const [y1, t1] = gesture.samples[0];
+    const v = (y1 - y) / Math.max(1, performance.now() - t1); // px/ms, + = upward
+    const rest = sheetRestHeights(el);
+    const order = ['peek', 'half', 'full'];
+    const h = el.getBoundingClientRect().height;
+    let target;
+    if (Math.abs(v) > 0.35) {
+      const nearestStart = order.reduce((a, b) => Math.abs(rest[b] - gesture.h0) < Math.abs(rest[a] - gesture.h0) ? b : a);
+      const i = order.indexOf(nearestStart) + (v > 0 ? 1 : -1);
+      if (i < 0) {
+        if (el.id === 'detail') { el.style.height = ''; closeDetail(); return; }
+        target = 'peek';
+      } else target = order[Math.min(i, 2)];
+    } else {
+      if (el.id === 'detail' && h < rest.peek * 0.6) { el.style.height = ''; closeDetail(); return; }
+      target = order.reduce((a, b) => Math.abs(rest[b] - h) < Math.abs(rest[a] - h) ? b : a);
+    }
+    setSheet(el, target);
+  };
+  // Touch: needs a non-passive move listener so a sheet drag can stop the page from scrolling
+  el.addEventListener('touchstart', (e) => { if (e.touches.length === 1) start(e.touches[0].clientY, e.target); }, { passive: true });
+  el.addEventListener('touchmove', (e) => { if (e.touches.length === 1) move(e.touches[0].clientY, e); }, { passive: false });
+  el.addEventListener('touchend', (e) => end(e.changedTouches[0].clientY));
+  el.addEventListener('touchcancel', () => { if (g && g.mode === 'drag') { el.classList.remove('dragging'); setSheet(el, el.dataset.sheet); } g = null; });
+  // Mouse (desktop browser at phone width): drag from the handle only
+  handle.addEventListener('pointerdown', (e) => {
+    if (e.pointerType !== 'mouse') return;
+    start(e.clientY, handle); handle.setPointerCapture(e.pointerId);
+  });
+  handle.addEventListener('pointermove', (e) => { if (e.pointerType === 'mouse') move(e.clientY, null); });
+  let mouseUp = false;
+  handle.addEventListener('pointerup', (e) => {
+    if (e.pointerType !== 'mouse') return;
+    const wasDrag = g && g.mode === 'drag';
+    end(e.clientY);
+    if (!wasDrag) cycleSheet(el);
+    mouseUp = true; setTimeout(() => { mouseUp = false; }, 0);
+  });
+  // A tap on the handle (touch) steps the sheet; a click right after a drag is swallowed
+  handle.addEventListener('click', (e) => { if (mouseUp || e.detail === 0) return; if (!swallowClick) cycleSheet(el); });
+  el.addEventListener('click', (e) => { if (swallowClick) { e.stopPropagation(); e.preventDefault(); } }, true);
   handle.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); cycleSheet(el); } });
 }
 function cycleSheet(el) {
@@ -1660,10 +1744,10 @@ function cycleSheet(el) {
 }
 
 const CHIPS = [
+  { id: 'near', label: 'Near me', icon: 'locate' },
   { id: 'mine', label: 'My customers' },
   { id: 'never', label: 'Never visited' },
   { id: 'stale', label: '90+ days' },
-  { id: 'near', label: 'Near me', icon: 'locate' },
   { id: 'more', label: 'Filters', icon: 'settings' },
 ];
 function chipOn(id) {

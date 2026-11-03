@@ -631,10 +631,13 @@ h1, h2, h3 { color: var(--heading); letter-spacing: -0.01em; }
   /* The list and the customer card are bottom sheets over the map */
   .sheet-handle {
     display: flex; align-items: center; justify-content: center;
-    width: 100%; height: 22px; padding: 0; border: none; background: transparent;
+    width: 100%; height: 30px; padding: 0; border: none; background: transparent;
     cursor: grab; touch-action: none; flex-shrink: 0;
   }
-  .sheet-handle span { width: 40px; height: 5px; border-radius: 3px; background: var(--at-gray-3); opacity: 0.7; }
+  .sheet-handle span { width: 48px; height: 5px; border-radius: 3px; background: var(--at-gray-3); }
+  /* The top block moves the sheet too; the scrolling content keeps its own scroll */
+  #sidebar .filters, #detail .detail-header { touch-action: none; }
+  #customerList, #detailBody { overscroll-behavior: contain; }
   #sidebar, #detail {
     position: fixed;
     left: 0; right: 0; bottom: 0; top: auto;
@@ -649,7 +652,7 @@ h1, h2, h3 { color: var(--heading); letter-spacing: -0.01em; }
   #sidebar.dragging, #detail.dragging { transition: none; }
   #sidebar { z-index: 400; }
   #detail { z-index: 500; }
-  #sidebar[data-sheet="peek"] { --sheet-h: calc(env(safe-area-inset-bottom, 0px) + 186px); }
+  #sidebar[data-sheet="peek"] { --sheet-h: calc(env(safe-area-inset-bottom, 0px) + 172px); }
   #sidebar[data-sheet="half"] { --sheet-h: 56dvh; }
   #sidebar[data-sheet="full"] { --sheet-h: calc(100dvh - env(safe-area-inset-top, 0px) - 8px); }
   #detail[data-sheet="peek"] { --sheet-h: calc(env(safe-area-inset-bottom, 0px) + 150px); }
@@ -658,7 +661,29 @@ h1, h2, h3 { color: var(--heading); letter-spacing: -0.01em; }
 
   /* Peek shows only search + chips: the header folds away */
   #sidebar .sidebar-header { order: 3; padding: 10px var(--s-3); }
-  #sidebar .filters { order: 1; border-bottom: none; padding-bottom: var(--s-2); }
+  #sidebar .filters { order: 1; border-bottom: none; padding: 0 var(--s-4) var(--s-2); }
+  /* Thumb-size controls: 44 px search, one scrolling row of 40 px chips */
+  #sidebar .filters input[type="search"] { min-height: 44px; font-size: 16px; }
+  .chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0 calc(-1 * var(--s-4)); padding: 0 var(--s-4); touch-action: pan-x; }
+  .chips::-webkit-scrollbar { display: none; }
+  .chip { min-height: 40px; padding: 6px 14px; font-size: var(--fs-sm); flex-shrink: 0; }
+  .chip .icon { width: 16px; height: 16px; }
+  .link-btn { padding: 12px 0; margin: -12px 0; font-size: var(--fs-sm); }
+  .filters select { min-height: 44px; font-size: 16px; }
+  .quick-actions a { min-height: 56px; font-size: var(--fs-sm); }
+  .quick-actions .icon { width: 20px; height: 20px; }
+  .detail-footer .btn { min-height: 48px; font-size: var(--fs-md); }
+  .mapboxgl-ctrl-group button { width: 40px !important; height: 40px !important; }
+  .outcome-chips .chip { min-height: 40px; }
+  .form-row input, .form-row select, .form-row textarea { min-height: 44px; font-size: 16px; }
+  /* Compact legend pill at the top of the map */
+  #legend {
+    display: flex !important; flex-wrap: nowrap; gap: 10px; align-items: center;
+    top: max(calc(env(safe-area-inset-top, 0px) + 10px), 10px); left: 12px; right: auto; bottom: auto;
+    padding: 6px 10px; border-radius: 999px; font-size: 11px;
+  }
+  #legend .legend-title { display: none; }
+  #legend > div { margin-top: 0; gap: 4px; }
   #sidebar #customerList { order: 2; }
   #sidebar .sidebar-header { border-top: 1px solid var(--border-soft); }
   #sidebar .sheet-handle { order: 0; }
@@ -670,7 +695,7 @@ h1, h2, h3 { color: var(--heading); letter-spacing: -0.01em; }
   #detail .detail-header .close { pointer-events: auto; width: 44px; height: 44px; }
   #detail[data-sheet="peek"] #detailBody { overflow: hidden; }
 
-  .sidebar-actions button { min-height: 40px; min-width: 40px; }
+  .sidebar-actions button { min-height: 44px; min-width: 44px; }
   .sidebar-logo { height: 22px; }
   .sidebar-header { padding-left: var(--s-3); padding-right: var(--s-3); }
   
@@ -689,7 +714,7 @@ h1, h2, h3 { color: var(--heading); letter-spacing: -0.01em; }
     top: max(calc(env(safe-area-inset-top, 0px) + 8px), 56px) !important;
     right: max(calc(env(safe-area-inset-right, 0px) + 8px), 8px) !important;
   }
-  #legend { display: none; } /* the chips carry the recency language on the phone */
+
 
   /* Inside the sidebar/detail, pad for notch + home indicator */
   #customerList { padding-bottom: env(safe-area-inset-bottom, 0px); }
