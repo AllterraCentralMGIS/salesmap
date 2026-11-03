@@ -3,19 +3,24 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#f9fafb" media="(prefers-color-scheme: light)" />
-  <meta name="theme-color" content="#0f172a" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#003054" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#041422" media="(prefers-color-scheme: dark)" />
   <title>SalesMap</title>
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" type="image/svg+xml" href="icons/icon.svg" />
   <link rel="apple-touch-icon" href="icons/icon-192.png" />
   <link rel="stylesheet" href="https://api.tomtom.com/maps-sdk-for-web/cdn/6.x/6.25.0/maps/maps.css" />
-  <link rel="stylesheet" href="styles.css?v=12" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700;800&display=swap" />
+  <link rel="stylesheet" href="styles.css?v=13" />
 </head>
 <body>
   <!-- Auth gate -->
   <div id="authScreen" class="auth-screen hidden">
     <div class="auth-card">
+      <img class="auth-logo light-only" src="assets/brand/allterra-logo-color.png" alt="AllTerra" />
+      <img class="auth-logo dark-only" src="assets/brand/allterra-logo-white.png" alt="AllTerra" />
       <h1>SalesMap</h1>
       <div class="auth-sub">Sign in to access your team's customer map.</div>
       <form id="authForm">
@@ -48,6 +53,10 @@
         <br/>Forgot your password? <a href="#" id="authForgot">Email me a reset link</a>.
       </div>
       <div id="authMsg" class="auth-msg"></div>
+      <div class="auth-dealer">
+        <span>AllTerra Central field sales</span>
+        <img src="assets/brand/trimble-authorized-dealer.png" alt="Trimble Authorized Dealer" />
+      </div>
     </div>
   </div>
 
@@ -55,12 +64,12 @@
   <div id="app" class="hidden">
     <aside id="sidebar">
       <div class="sidebar-header">
-        <h1>SalesMap</h1>
+        <h1><img class="sidebar-logo" src="assets/brand/allterra-logo-white.png" alt="AllTerra SalesMap" /></h1>
         <div class="sidebar-actions">
           <button id="btnNewCustomer" title="Add a new customer">+ New</button>
-          <button id="btnSettings" title="Settings">⚙</button>
-          <button id="btnSignOut" title="Sign out">⎋</button>
-          <button id="btnSidebarClose" class="phone-only" title="Back to map">×</button>
+          <button id="btnSettings" title="Settings" aria-label="Settings">⚙</button>
+          <button id="btnSignOut" title="Sign out" aria-label="Sign out">⎋</button>
+          <button id="btnSidebarClose" class="phone-only" title="Back to map" aria-label="Back to map">×</button>
         </div>
       </div>
 
@@ -131,7 +140,7 @@
 
   <!-- App -->
   <script src="config.js?v=9"></script>
-  <script src="js/app.js?v=12"></script>
+  <script src="js/app.js?v=13"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {

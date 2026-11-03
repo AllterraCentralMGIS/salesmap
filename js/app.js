@@ -282,7 +282,7 @@ async function initMap() {
 }
 function showMapPlaceholder(msg) {
   document.getElementById('map').innerHTML =
-    `<div class="empty-state" style="padding-top:80px;">${escapeHtml(msg)}</div>`;
+    `<div class="empty-state tall">${escapeHtml(msg)}</div>`;
 }
 
 function recencyBucket(lastVisitDate) {
@@ -586,7 +586,7 @@ async function renderDetail(c) {
   body.innerHTML = `
     <h2 class="detail-title">${escapeHtml(c.company || '(no name)')}</h2>
     <div class="detail-sub">${escapeHtml(c.contact_name || '')}</div>
-    ${c.zone_name ? `<div class="detail-zone-pill" style="background:${c.zone_color || '#e5e7eb'}33; color:${c.zone_color || '#374151'}">${escapeHtml(c.zone_name)}</div>` : ''}
+    ${c.zone_name ? `<div class="detail-zone-pill" style="${c.zone_color ? `--zone:${escapeAttr(c.zone_color)}` : ''}">${escapeHtml(c.zone_name)}</div>` : ''}
 
     <div class="detail-section">
       <h3>Contact</h3>
@@ -611,7 +611,7 @@ async function renderDetail(c) {
     <div class="detail-section">
       <h3>Visit history (${(visits || []).length})</h3>
       <div id="visitList">
-        ${(visits || []).length === 0 ? '<div class="empty-state" style="padding:8px 0;">No visits yet.</div>' : ''}
+        ${(visits || []).length === 0 ? '<div class="empty-state inline">No visits yet.</div>' : ''}
         ${(visits || []).map(renderVisit).join('')}
       </div>
     </div>
@@ -724,7 +724,7 @@ function openCustomerForm(existing) {
       <div class="form-row"><label>Salesperson code</label><input id="fSalesperson" value="${escapeAttr(c.salesperson_code)}" /></div>
       <div class="form-row"><label>Territory code</label><input id="fTerritory" value="${escapeAttr(c.territory_code)}" /></div>
     </div>
-    <div class="form-row" style="font-size:12px;color:#6b7280;">
+    <div class="form-row hint">
       Address will be geocoded and a zone assigned automatically when you save.
     </div>
   `, async () => {
@@ -807,7 +807,7 @@ function openSettings(firstRun) {
   const filteredNow = applyFilters(state.customers);
   const bulkCount = filtersActive() && filteredNow.length < state.customers.length ? filteredNow.length : 0;
   openModal(firstRun ? 'Welcome to SalesMap' : 'Settings', `
-    ${firstRun ? '<p style="margin-top:0;color:#4b5563;">Paste your TomTom API key to enable the map and geocoding.</p>' : ''}
+    ${firstRun ? '<p class="hint-top">Paste your TomTom API key to enable the map and geocoding.</p>' : ''}
     <div class="form-row">
       <label>Display name</label>
       <input id="sName" value="${escapeAttr(state.profile?.display_name || '')}" />
@@ -820,9 +820,9 @@ function openSettings(firstRun) {
       <label>TomTom API key</label>
       <input id="sKey" value="${escapeAttr(state.tomtomKey || '')}" placeholder="Your TomTom API key" />
     </div>
-    <div style="font-size:12px;color:#6b7280;">Get a free key at developer.tomtom.com — Maps + Search products.</div>
+    <div class="hint">Get a free key at developer.tomtom.com — Maps + Search products.</div>
 
-    <div class="form-row" style="margin-top:14px;">
+    <div class="form-row mt-4">
       <label>Theme</label>
       <select id="sTheme">
         <option value="auto">Auto (match system)</option>
@@ -833,7 +833,7 @@ function openSettings(firstRun) {
 
     <div class="detail-section">
       <h3>Import data</h3>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <div class="btn-row">
         <button class="btn" id="sImportCustomers">Import customers (Excel)</button>
         <button class="btn" id="sImportVisits">Import visit history (Excel)</button>
         <button class="btn" id="sImportZones">Load zones (KML)</button>
@@ -846,12 +846,12 @@ function openSettings(firstRun) {
     </div>
 
     ${firstRun ? '' : `
-    <div class="detail-section" style="border-top:1px solid #e5e7eb;padding-top:14px;">
-      <h3 style="color:#b91c1c;">Danger zone</h3>
+    <div class="detail-section section-divider">
+      <h3 class="danger-title">Danger zone</h3>
       ${bulkCount > 0 ? `
-      <div style="font-size:12px;color:#6b7280;margin-bottom:8px;">Deletes the ${bulkCount} customer${bulkCount === 1 ? '' : 's'} matching the current list filters, with their visit history.</div>
-      <button class="btn btn-danger" id="sDeleteFiltered" style="margin-bottom:14px;">Delete the ${bulkCount} filtered customer${bulkCount === 1 ? '' : 's'}</button>` : ''}
-      <div style="font-size:12px;color:#6b7280;margin-bottom:8px;">Removes all customers and visit history. Zones stay.</div>
+      <div class="hint mb-2">Deletes the ${bulkCount} customer${bulkCount === 1 ? '' : 's'} matching the current list filters, with their visit history.</div>
+      <button class="btn btn-danger mb-4" id="sDeleteFiltered">Delete the ${bulkCount} filtered customer${bulkCount === 1 ? '' : 's'}</button>` : ''}
+      <div class="hint mb-2">Removes all customers and visit history. Zones stay.</div>
       <button class="btn btn-danger" id="sClearAll">Clear all customers and visits</button>
     </div>`}
   `, async () => {
@@ -1043,8 +1043,8 @@ function buildMappingDialogBody(preview, requireDate) {
   const { headers, rowCount, autoMap, samples, targets } = preview;
   const unmatched = headers.filter((h) => !autoMap[h]).length;
   const summary = unmatched === 0
-    ? `<span style="color:#15803d;">All ${headers.length} columns auto-matched ✓</span> · ${rowCount} rows`
-    : `<span style="color:#b45309;">${unmatched} of ${headers.length} columns need mapping</span> · ${rowCount} rows`;
+    ? `<span class="text-success">All ${headers.length} columns auto-matched ✓</span> · ${rowCount} rows`
+    : `<span class="text-warning">${unmatched} of ${headers.length} columns need mapping</span> · ${rowCount} rows`;
   const rowsHtml = headers.map((h) => {
     const sel = autoMap[h] || '';
     const sample = samples[h] || '';
@@ -1062,8 +1062,8 @@ function buildMappingDialogBody(preview, requireDate) {
       </div>`;
   }).join('');
   return `
-    <div style="font-size:13px;margin-bottom:10px;color:#374151;">${summary}</div>
-    <div style="font-size:12px;color:#6b7280;margin-bottom:10px;">
+    <div class="mb-3">${summary}</div>
+    <div class="hint mb-3">
       Match each Excel column to a SalesMap field. Set to <em>— Ignore —</em> to skip a column.${requireDate ? ' <b>Visit date is required.</b>' : ''}
     </div>
     <div class="mapping-table">
@@ -1323,7 +1323,7 @@ function openModal(title, bodyHtml, onSave) {
       <div class="modal">
         <div class="modal-header">
           <h2>${escapeHtml(title)}</h2>
-          <button class="close" id="modalClose" style="background:none;border:none;font-size:22px;cursor:pointer;color:#6b7280;">×</button>
+          <button class="close" id="modalClose" title="Close">×</button>
         </div>
         <div class="modal-body">${bodyHtml}</div>
         <div class="modal-footer">
