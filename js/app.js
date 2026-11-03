@@ -215,9 +215,10 @@ async function onSignedIn(user) {
 
 // ============== UI BINDINGS ==============
 function bindAppUI() {
+  const searchDebounced = debounce(() => { renderList(); renderMarkers(); }, 150);
   document.getElementById('search').addEventListener('input', (e) => {
-    state.filters.q = e.target.value.toLowerCase();
-    renderList(); renderMarkers();
+    state.filters.q = e.target.value.trim().toLowerCase();
+    searchDebounced();
   });
   document.getElementById('filterZone').addEventListener('change', (e) => {
     state.filters.zoneId = e.target.value; renderList(); renderMarkers();
@@ -268,13 +269,12 @@ async function initMap() {
   }));
   state.map.on('load', () => {
     renderZonePolygons();
-    renderMarkers();
+    buildMarkers();
     // Don't auto-fit on initial load — start centered on Houston per config
   });
   // Refresh the sidebar list when panning/zooming if viewport-filter is on
-  state.map.on('moveend', () => {
-    if (state.filters.viewport) renderList();
-  });
+  const viewportList = debounce(() => { if (state.filters.viewport) renderList(); }, 120);
+  state.map.on('moveend', viewportList);
   state.map.on('error', (e) => {
     console.error('Map error:', e && e.error);
     if (e && e.error && e.error.status === 403) {
@@ -318,20 +318,36 @@ function renderZonePolygons() {
   }
 }
 
-function renderMarkers() {
+// One marker per customer, built when the data changes. Filtering only shows or
+// hides them; selection toggles a class on two elements. Nothing is rebuilt per keystroke.
+function buildMarkers() {
   if (!state.map) return;
   for (const m of state.markers.values()) m.remove();
   state.markers.clear();
-  const filtered = applyFilters(state.customers);
-  for (const c of filtered) {
+  for (const c of state.customers) {
     if (!isReasonableCoord(c.lat, c.lng)) continue;
     const el = document.createElement('div');
     el.className = `sm-pin ${recencyBucket(c.last_visit_date)}`;
+    el.dataset.id = c.id;
     if (c.id === state.selectedId) el.classList.add('selected');
     el.addEventListener('click', (e) => { e.stopPropagation(); selectCustomer(c.id, false); });
     const marker = new tt.Marker({ element: el }).setLngLat([c.lng, c.lat]).addTo(state.map);
     state.markers.set(c.id, marker);
   }
+  renderMarkers();
+}
+function renderMarkers() {
+  if (!state.map) return;
+  const visible = new Set(applyFilters(state.customers).map((c) => c.id));
+  for (const [id, m] of state.markers) {
+    m.getElement().classList.toggle('hidden', !visible.has(id));
+  }
+}
+function setSelectedPin(prevId, id) {
+  const prev = prevId != null && state.markers.get(prevId);
+  const next = id != null && state.markers.get(id);
+  if (prev) prev.getElement().classList.remove('selected');
+  if (next) next.getElement().classList.add('selected');
 }
 
 // Sanity guard — null, NaN, 0/0 sentinels, or coordinates outside planet Earth.
@@ -409,10 +425,33 @@ async function refreshAll() {
   populateSalespersonFilter();
   populateVisitorFilter();
   renderList();
-  if (state.map) { renderZonePolygons(); renderMarkers(); }
+  if (state.map) { renderZonePolygons(); buildMarkers(); }
+}
+
+// Import-only libraries load on first use instead of at startup.
+const LIBS = {
+  xlsx: 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js',
+  togeojson: 'https://cdn.jsdelivr.net/npm/@tmcw/togeojson@7.1.0/dist/togeojson.umd.min.js',
+  turf: 'https://cdn.jsdelivr.net/npm/@turf/turf@7.2.0/turf.min.js',
+};
+const libLoads = {};
+function ensureLib(name) {
+  const present = { xlsx: () => typeof XLSX !== 'undefined', togeojson: () => typeof toGeoJSON !== 'undefined', turf: () => typeof turf !== 'undefined' }[name];
+  if (present()) return Promise.resolve();
+  if (!libLoads[name]) {
+    libLoads[name] = new Promise((resolve, reject) => {
+      const el = document.createElement('script');
+      el.src = LIBS[name];
+      el.onload = resolve;
+      el.onerror = () => { delete libLoads[name]; reject(new Error(`Could not load ${name}. Check the connection and try again.`)); };
+      document.head.appendChild(el);
+    });
+  }
+  return libLoads[name];
 }
 
 function findZoneForPoint(lat, lng) {
+  if (!state.zones.length || typeof turf === 'undefined') return null;
   const pt = turf.point([lng, lat]);
   for (const z of state.zones) {
     try {
@@ -528,40 +567,49 @@ async function deleteFiltered() {
 
 function renderList() {
   const ul = document.getElementById('customerList');
-  ul.innerHTML = '';
   const filtered = applyFilters(state.customers);
   const countsEl = document.getElementById('counts');
   countsEl.textContent = `${filtered.length} of ${state.customers.length} customers`;
 
   if (filtered.length === 0) {
-    const li = document.createElement('li');
-    li.innerHTML = '<div class="empty-state">No customers match.</div>';
-    ul.appendChild(li);
+    ul.innerHTML = '<li><div class="empty-state">No customers match.</div></li>';
     return;
   }
+  const frag = document.createDocumentFragment();
   for (const c of filtered) {
     const li = document.createElement('li');
+    li.dataset.id = c.id;
     if (c.id === state.selectedId) li.classList.add('active');
     li.innerHTML = `
       <div class="pin sm-pin ${recencyBucket(c.last_visit_date)}"></div>
       <div class="info">
         <div class="name">${escapeHtml(c.company || '(no name)')}</div>
         <div class="sub">${escapeHtml(c.contact_name || '')} · ${escapeHtml(c.city || '')}</div>
-        <div class="meta">${c.zone_name ? escapeHtml(c.zone_name) : 'No zone'} · ${c.last_visit_date ? `Last visit ${c.last_visit_date}` : 'Never visited'}</div>
+        <div class="meta">${c.zone_name ? escapeHtml(c.zone_name) : 'No zone'} · ${c.last_visit_date ? `Last visit ${escapeHtml(c.last_visit_date)}` : 'Never visited'}</div>
       </div>`;
-    li.addEventListener('click', () => {
-      selectCustomer(c.id, true);
-      // On phone, close the sidebar overlay when picking
-      document.getElementById('app').classList.remove('sidebar-open');
-    });
-    ul.appendChild(li);
+    frag.appendChild(li);
   }
+  ul.replaceChildren(frag);
+}
+// One click handler for the whole list (rows carry data-id)
+document.getElementById('customerList').addEventListener('click', (e) => {
+  const li = e.target.closest('li[data-id]');
+  if (!li) return;
+  selectCustomer(Number(li.dataset.id), true);
+  // On phone, close the sidebar overlay when picking
+  document.getElementById('app').classList.remove('sidebar-open');
+});
+function setSelectedRow(prevId, id) {
+  const ul = document.getElementById('customerList');
+  if (prevId != null) ul.querySelector(`li[data-id="${prevId}"]`)?.classList.remove('active');
+  if (id != null) ul.querySelector(`li[data-id="${id}"]`)?.classList.add('active');
 }
 
 // ============== SELECT / DETAIL ==============
 async function selectCustomer(id, panTo) {
+  const prev = state.selectedId;
   state.selectedId = id;
-  renderList(); renderMarkers();
+  setSelectedRow(prev, id); setSelectedPin(prev, id);
   const c = state.customers.find((x) => x.id === id);
   if (!c) return;
   if (panTo && state.map && c.lat != null && c.lng != null) {
@@ -573,10 +621,11 @@ async function selectCustomer(id, panTo) {
 }
 
 function closeDetail() {
+  const prev = state.selectedId;
   state.selectedId = null;
   document.getElementById('app').classList.remove('with-detail');
   document.getElementById('detail').classList.add('hidden');
-  renderList(); renderMarkers();
+  setSelectedRow(prev, null); setSelectedPin(prev, null);
 }
 
 async function renderDetail(c) {
@@ -759,6 +808,7 @@ function openCustomerForm(existing) {
           data.lat = geo.lat;
           data.lng = geo.lng;
           data.geocode_quality = geo.quality;
+          if (state.zones.length) await ensureLib('turf');
           data.zone_id = findZoneForPoint(geo.lat, geo.lng);
         } else {
           data.geocode_quality = 'FAILED';
@@ -1086,6 +1136,8 @@ function readMapping() {
 }
 
 async function importCustomersFlow() {
+  await ensureLib('xlsx');
+  if (state.zones.length) await ensureLib('turf');
   const file = await pickFile('.xlsx,.xlsm,.xls');
   if (!file) return;
   showToast('Reading file…', 0);
@@ -1185,6 +1237,7 @@ async function runCustomerImport(rows, mapping) {
 }
 
 async function importVisitsFlow() {
+  await ensureLib('xlsx');
   const file = await pickFile('.xlsx,.xlsm,.xls');
   if (!file) return;
   showToast('Reading file…', 0);
@@ -1278,6 +1331,7 @@ async function runVisitImport(rows, mapping) {
 }
 
 async function importZonesFlow() {
+  await Promise.all([ensureLib('togeojson'), ensureLib('turf')]);
   const file = await pickFile('.kml');
   if (!file) return;
   showToast('Loading KML…', 0);
@@ -1383,6 +1437,10 @@ function showToast(msg, durationMs) {
 function hideToast() { document.getElementById('toast').classList.add('hidden'); }
 
 // ============== HELPERS ==============
+function debounce(fn, ms) {
+  let t = null;
+  return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+}
 function getVal(id) { return document.getElementById(id).value.trim() || null; }
 function escapeHtml(s) {
   if (s == null) return '';
