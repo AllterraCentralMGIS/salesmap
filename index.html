@@ -48,6 +48,9 @@
         </div>
         <button type="submit" class="btn btn-primary" id="authSubmit">Sign in</button>
       </form>
+      <div id="linkStep" class="hidden">
+        <button type="button" class="btn btn-primary" id="linkContinue">Continue</button>
+      </div>
       <form id="pwForm" class="hidden">
         <div class="form-row">
           <label for="pwNew">New password</label>
@@ -161,7 +164,7 @@
 
   <!-- App -->
   <script src="config.js?v=9"></script>
-  <script src="js/app.js?v=25"></script>
+  <script src="js/app.js?v=26"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {

@@ -3,11 +3,27 @@
 'use strict';
 
 const CFG = window.SALESMAP_CONFIG;
-// Read invite/reset link details before the Supabase client consumes the URL hash
+// Read invite/reset link details before the Supabase client consumes the URL.
+// Three link shapes are handled:
+//  - ?token_hash=…&type=invite|recovery (email templates point here): the code is only
+//    used when the person taps Continue, so an email link scanner that opens the page
+//    can't use up the one-time link
+//  - ?code=… (PKCE): exchanged for a session on load
+//  - #access_token=…&type=… (Supabase's default links): read by the client itself
 const AUTH_LINK = (() => {
-  const p = new URLSearchParams(location.hash.slice(1) || location.search.slice(1));
-  return { type: p.get('type'), error: p.get('error_description') };
+  const q = new URLSearchParams(location.search.slice(1));
+  const h = new URLSearchParams(location.hash.slice(1));
+  return {
+    type: h.get('type') || q.get('type'),
+    error: h.get('error_description') || q.get('error_description'),
+    errorCode: h.get('error_code') || q.get('error_code'),
+    tokenHash: q.get('token_hash'),
+    code: q.get('code'),
+  };
 })();
+function clearAuthParams() {
+  history.replaceState(null, '', location.pathname);
+}
 const sb = supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY);
 
 const state = {
@@ -65,6 +81,17 @@ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () 
 
 document.addEventListener('DOMContentLoaded', async () => {
   bindAuthUI();
+  if (AUTH_LINK.tokenHash && (AUTH_LINK.type === 'invite' || AUTH_LINK.type === 'recovery')) {
+    showLinkStep(AUTH_LINK.type);
+    return bindAuthEvents();
+  }
+  if (AUTH_LINK.code) {
+    const { error } = await sb.auth.exchangeCodeForSession(AUTH_LINK.code);
+    clearAuthParams();
+    if (error) { showAuthScreen(); showLinkError(); return bindAuthEvents(); }
+    showSetPassword('link');
+    return bindAuthEvents();
+  }
   const { data: { session } } = await sb.auth.getSession();
   if (session && (AUTH_LINK.type === 'invite' || AUTH_LINK.type === 'recovery')) {
     showSetPassword('link');
@@ -72,17 +99,47 @@ document.addEventListener('DOMContentLoaded', async () => {
     await onSignedIn(session.user);
   } else {
     showAuthScreen();
-    if (AUTH_LINK.error) {
-      const msg = document.getElementById('authMsg');
-      msg.textContent = `${AUTH_LINK.error.replace(/\+/g, ' ')}. Ask for a new link, or use "Email me a reset link".`;
-      msg.className = 'auth-msg error';
-    }
+    if (AUTH_LINK.error) showLinkError();
   }
+  bindAuthEvents();
+});
+function bindAuthEvents() {
   sb.auth.onAuthStateChange((event, session) => {
     if (event === 'SIGNED_OUT') location.reload();
     if (event === 'PASSWORD_RECOVERY') showSetPassword('link');
   });
-});
+}
+// The one-time code is used only when the person taps Continue (scanners don't tap)
+function showLinkStep(type) {
+  showAuthScreen();
+  document.getElementById('authForm').classList.add('hidden');
+  document.getElementById('authFootnote').classList.add('hidden');
+  document.querySelector('.auth-sub').textContent = type === 'invite'
+    ? 'Welcome. Tap Continue to choose your password.'
+    : 'Tap Continue to choose a new password.';
+  const step = document.getElementById('linkStep');
+  step.classList.remove('hidden');
+  const btn = document.getElementById('linkContinue');
+  btn.addEventListener('click', async () => {
+    btn.disabled = true; btn.textContent = 'Checking…';
+    const { error } = await sb.auth.verifyOtp({ token_hash: AUTH_LINK.tokenHash, type: AUTH_LINK.type });
+    clearAuthParams();
+    step.classList.add('hidden');
+    if (error) {
+      document.getElementById('authForm').classList.remove('hidden');
+      document.getElementById('authFootnote').classList.remove('hidden');
+      document.querySelector('.auth-sub').textContent = "Sign in to access your team's customer map.";
+      showLinkError();
+      return;
+    }
+    showSetPassword('link');
+  }, { once: true });
+}
+function showLinkError() {
+  const msg = document.getElementById('authMsg');
+  msg.textContent = 'This link has expired or was already used. Enter your email above and tap "Email me a reset link" to get a fresh one.';
+  msg.className = 'auth-msg error';
+}
 
 // ============== AUTH ==============
 function showAuthScreen() {
