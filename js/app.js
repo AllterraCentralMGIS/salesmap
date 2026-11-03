@@ -513,7 +513,9 @@ function filtersActive() {
 async function deleteFiltered() {
   const filtered = applyFilters(state.customers);
   if (filtered.length === 0) return;
-  if (!confirm(`Delete ${filtered.length} customer${filtered.length === 1 ? '' : 's'} matching the current filters?\n\nThis also deletes their visit history. Cannot be undone.`)) return;
+  const typed = prompt(`Delete ${filtered.length} customer${filtered.length === 1 ? '' : 's'} matching the current filters?\n\nThis also deletes their visit history and cannot be undone.\nType ${filtered.length} to confirm.`);
+  if (typed === null) return;
+  if (typed.trim() !== String(filtered.length)) { showToast('Not deleted: the number did not match.', 3000); return; }
   const ids = filtered.map((c) => c.id);
   const { error } = await sb.from('customers').delete().in('id', ids);
   if (error) { showToast(`Delete failed: ${error.message}`, 5000); return; }
@@ -527,13 +529,7 @@ function renderList() {
   ul.innerHTML = '';
   const filtered = applyFilters(state.customers);
   const countsEl = document.getElementById('counts');
-  const showBulk = filtersActive() && filtered.length > 0 && filtered.length < state.customers.length;
-  countsEl.innerHTML = `
-    <span>${filtered.length} of ${state.customers.length} customers</span>
-    ${showBulk ? `<button class="counts-delete" id="btnDeleteFiltered">Delete ${filtered.length}</button>` : ''}
-  `;
-  const btn = document.getElementById('btnDeleteFiltered');
-  if (btn) btn.addEventListener('click', deleteFiltered);
+  countsEl.textContent = `${filtered.length} of ${state.customers.length} customers`;
 
   if (filtered.length === 0) {
     const li = document.createElement('li');
@@ -808,6 +804,8 @@ async function geocodeAddress(address) {
 
 // ============== SETTINGS ==============
 function openSettings(firstRun) {
+  const filteredNow = applyFilters(state.customers);
+  const bulkCount = filtersActive() && filteredNow.length < state.customers.length ? filteredNow.length : 0;
   openModal(firstRun ? 'Welcome to SalesMap' : 'Settings', `
     ${firstRun ? '<p style="margin-top:0;color:#4b5563;">Paste your TomTom API key to enable the map and geocoding.</p>' : ''}
     <div class="form-row">
@@ -850,6 +848,9 @@ function openSettings(firstRun) {
     ${firstRun ? '' : `
     <div class="detail-section" style="border-top:1px solid #e5e7eb;padding-top:14px;">
       <h3 style="color:#b91c1c;">Danger zone</h3>
+      ${bulkCount > 0 ? `
+      <div style="font-size:12px;color:#6b7280;margin-bottom:8px;">Deletes the ${bulkCount} customer${bulkCount === 1 ? '' : 's'} matching the current list filters, with their visit history.</div>
+      <button class="btn btn-danger" id="sDeleteFiltered" style="margin-bottom:14px;">Delete the ${bulkCount} filtered customer${bulkCount === 1 ? '' : 's'}</button>` : ''}
       <div style="font-size:12px;color:#6b7280;margin-bottom:8px;">Removes all customers and visit history. Zones stay.</div>
       <button class="btn btn-danger" id="sClearAll">Clear all customers and visits</button>
     </div>`}
@@ -877,6 +878,9 @@ function openSettings(firstRun) {
   document.getElementById('sImportVisits').addEventListener('click', () => { closeModal(); importVisitsFlow(); });
   document.getElementById('sImportZones').addEventListener('click', () => { closeModal(); importZonesFlow(); });
   document.getElementById('sChangePassword').addEventListener('click', () => { closeModal(); showSetPassword('change'); });
+
+  const bulkBtn = document.getElementById('sDeleteFiltered');
+  if (bulkBtn) bulkBtn.addEventListener('click', async () => { closeModal(); await deleteFiltered(); });
 
   const clearBtn = document.getElementById('sClearAll');
   if (clearBtn) clearBtn.addEventListener('click', async () => {

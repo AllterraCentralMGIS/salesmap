@@ -100,17 +100,12 @@ button { font-family: inherit; }
   min-width: 0;
 }
 .viewport-toggle input {
-  margin: 0; cursor: pointer; accent-color: #2563eb;
+  width: auto; margin: 0; cursor: pointer; accent-color: #2563eb;
   flex-shrink: 0;
 }
 .viewport-toggle span { min-width: 0; flex: 1; }
 
 .counts { font-size: 12px; color: #6b7280; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-.counts-delete {
-  font-size: 11px; padding: 2px 8px; border-radius: 6px;
-  border: 1px solid #fca5a5; background: #fef2f2; color: #b91c1c; cursor: pointer;
-}
-.counts-delete:hover { background: #fee2e2; }
 
 #customerList {
   flex: 1; list-style: none; margin: 0; padding: 0; overflow-y: auto;
@@ -274,7 +269,7 @@ button { font-family: inherit; }
   position: fixed; inset: 0;
   background: rgba(0,0,0,0.4);
   display: flex; align-items: center; justify-content: center;
-  z-index: 100; padding: 16px;
+  z-index: 600; padding: 16px; /* above the phone list (400) and detail (500) overlays */
 }
 .modal {
   background: #fff; border-radius: 10px;
@@ -493,10 +488,6 @@ button { font-family: inherit; }
 }
 [data-theme="dark"] .recenter-fab:hover { background: #334155; }
 
-[data-theme="dark"] .counts-delete {
-  background: #2a1414; border-color: #7f1d1d; color: #fca5a5;
-}
-[data-theme="dark"] .counts-delete:hover { background: #3a1818; }
 
 /* Auth screen card in dark mode */
 [data-theme="dark"] .auth-card { background: #1e293b; color: #e2e8f0; }
