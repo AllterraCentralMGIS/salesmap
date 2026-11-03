@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700;800&display=swap" />
-  <link rel="stylesheet" href="styles.css?v=17" />
+  <link rel="stylesheet" href="styles.css?v=18" />
 </head>
 <body>
   <!-- Icon set: 24px stroke icons, drawn once, used with <use> -->
@@ -131,6 +131,11 @@
         <button class="close icon-btn" id="detailClose" title="Close" aria-label="Close customer"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg></button>
       </div>
       <div id="detailBody"></div>
+      <div class="detail-footer">
+        <button class="btn btn-primary" id="btnLogVisit"><svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>Log visit</button>
+        <button class="btn" id="btnEditCustomer">Edit</button>
+        <button class="btn btn-danger" id="btnDeleteCustomer">Delete</button>
+      </div>
     </aside>
   </div>
 
@@ -147,7 +152,7 @@
 
   <!-- App -->
   <script src="config.js?v=9"></script>
-  <script src="js/app.js?v=17"></script>
+  <script src="js/app.js?v=18"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {

@@ -247,6 +247,10 @@ function bindAppUI() {
   document.getElementById('btnSettings').addEventListener('click', () => openSettings(false));
   document.getElementById('btnSignOut').addEventListener('click', async () => { await sb.auth.signOut(); });
   document.getElementById('detailClose').addEventListener('click', closeDetail);
+  const selected = () => state.customers.find((x) => x.id === state.selectedId);
+  document.getElementById('btnLogVisit').addEventListener('click', () => { if (state.selectedId != null) openVisitForm(state.selectedId); });
+  document.getElementById('btnEditCustomer').addEventListener('click', () => { const c = selected(); if (c) openCustomerForm(c); });
+  document.getElementById('btnDeleteCustomer').addEventListener('click', () => { const c = selected(); if (c) deleteCustomer(c); });
   document.getElementById('phoneListBtn').addEventListener('click', () => {
     document.getElementById('app').classList.toggle('sidebar-open');
   });
@@ -710,6 +714,21 @@ async function renderDetail(c) {
     .eq('customer_id', c.id)
     .order('visit_date', { ascending: false });
   const body = document.getElementById('detailBody');
+  // Only filled-in fields get a row; geocode quality is internal and stays off the panel
+  const row = (label, html) => html ? `<div class="label">${label}</div><div>${html}</div>` : '';
+  const tel = (v) => v ? `<a href="tel:${escapeAttr(v)}">${escapeHtml(v)}</a>` : '';
+  const addr = [escapeHtml(c.address || ''), escapeHtml([c.city, c.state, c.post_code].filter(Boolean).join(', '))].filter(Boolean).join('<br/>');
+  const fields = [
+    row('Job title', escapeHtml(c.job_title || '')),
+    row('Address', addr),
+    row('Phone', tel(c.phone)),
+    row('Mobile', tel(c.mobile)),
+    row('Email', c.email ? `<a href="mailto:${escapeAttr(c.email)}">${escapeHtml(c.email)}</a>` : ''),
+    row('Salesperson', escapeHtml(c.salesperson_code || '')),
+    row('Territory', escapeHtml(c.territory_code || '')),
+    row('Customer #', escapeHtml(c.customer_no || '')),
+  ].join('');
+  const n = (visits || []).length;
   body.innerHTML = `
     <h2 class="detail-title">${escapeHtml(c.company || '(no name)')}</h2>
     <div class="detail-sub">${escapeHtml(c.contact_name || '')}</div>
@@ -717,41 +736,22 @@ async function renderDetail(c) {
 
     <div class="detail-section">
       <h3>Contact</h3>
-      <div class="field-grid">
-        <div class="label">Job title</div><div>${escapeHtml(c.job_title || '')}</div>
-        <div class="label">Address</div><div>${escapeHtml(c.address || '')}<br/>${escapeHtml([c.city, c.state, c.post_code].filter(Boolean).join(', '))}</div>
-        <div class="label">Phone</div><div>${c.phone ? `<a href="tel:${escapeHtml(c.phone)}">${escapeHtml(c.phone)}</a>` : ''}</div>
-        <div class="label">Mobile</div><div>${c.mobile ? `<a href="tel:${escapeHtml(c.mobile)}">${escapeHtml(c.mobile)}</a>` : ''}</div>
-        <div class="label">Email</div><div>${c.email ? `<a href="mailto:${escapeHtml(c.email)}">${escapeHtml(c.email)}</a>` : ''}</div>
-        <div class="label">Salesperson</div><div>${escapeHtml(c.salesperson_code || '')}</div>
-        <div class="label">Territory</div><div>${escapeHtml(c.territory_code || '')}</div>
-        <div class="label">Customer #</div><div>${escapeHtml(c.customer_no || '')}</div>
-        <div class="label">Geocode</div><div>${escapeHtml(c.geocode_quality || '')}</div>
-      </div>
-      <div class="detail-actions">
-        <button class="btn btn-primary" id="btnLogVisit">+ Log visit</button>
-        <button class="btn" id="btnEditCustomer">Edit</button>
-        <button class="btn btn-danger" id="btnDeleteCustomer">Delete</button>
-      </div>
+      ${fields ? `<div class="field-grid">${fields}</div>` : '<div class="empty-state inline">No contact details yet. Use Edit to add some.</div>'}
     </div>
 
     <div class="detail-section">
-      <h3>Visit history (${(visits || []).length})</h3>
+      <h3>Visit history (${n})</h3>
       <div id="visitList">
-        ${(visits || []).length === 0 ? '<div class="empty-state inline">No visits yet.</div>' : ''}
+        ${n === 0 ? '<div class="empty-state inline">No visits logged yet. Log the first one below.</div>' : ''}
         ${(visits || []).map(renderVisit).join('')}
       </div>
     </div>
   `;
-  document.getElementById('btnLogVisit').addEventListener('click', () => openVisitForm(c.id));
-  document.getElementById('btnEditCustomer').addEventListener('click', () => openCustomerForm(c));
-  document.getElementById('btnDeleteCustomer').addEventListener('click', () => deleteCustomer(c));
   for (const v of (visits || [])) {
     const btn = document.getElementById(`del-visit-${v.id}`);
     if (btn) btn.addEventListener('click', () => deleteVisit(c.id, v.id));
   }
 }
-
 function renderVisit(v) {
   const by = state.profilesById[v.visitor_id];
   const byLabel = by ? by.display_name : '(unknown)';
@@ -776,6 +776,7 @@ async function deleteCustomer(c) {
 }
 
 async function deleteVisit(customerId, visitId) {
+  if (!confirm('Remove this visit from the history? This cannot be undone.')) return;
   const { error } = await sb.from('visits').delete().eq('id', visitId);
   if (error) { showToast(`Delete failed: ${error.message}`, 5000); return; }
   await refreshAll();
@@ -791,20 +792,26 @@ function openVisitForm(customerId) {
     <div class="form-row">
       <label for="vOutcome">Outcome</label>
       <select id="vOutcome">
-        <option value="">(none)</option>
-        <option>Routine check in</option>
-        <option>Training</option>
-        <option>Delivery</option>
-        <option>Met with decision-maker</option>
-        <option>Met with gatekeeper</option>
-        <option>Decision-maker not in</option>
-        <option>Dropped off card / literature</option>
-        <option>Scheduled follow-up appointment</option>
-        <option>Quote requested</option>
-        <option>Demo scheduled</option>
-        <option>Closed sale</option>
-        <option>Not interested</option>
-        <option>Business closed / moved</option>
+        <option value="">Not recorded</option>
+        <optgroup label="Contact">
+          <option>Routine check in</option>
+          <option>Met with decision-maker</option>
+          <option>Met with gatekeeper</option>
+          <option>Decision-maker not in</option>
+          <option>Dropped off card / literature</option>
+        </optgroup>
+        <optgroup label="Progress">
+          <option>Scheduled follow-up appointment</option>
+          <option>Quote requested</option>
+          <option>Demo scheduled</option>
+          <option>Training</option>
+          <option>Delivery</option>
+          <option>Closed sale</option>
+        </optgroup>
+        <optgroup label="Outcome">
+          <option>Not interested</option>
+          <option>Business closed / moved</option>
+        </optgroup>
       </select>
     </div>
     <div class="form-row"><label for="vNotes">Notes</label><textarea id="vNotes" placeholder="What was discussed?"></textarea></div>
@@ -821,7 +828,7 @@ function openVisitForm(customerId) {
     await refreshAll();
     const c = state.customers.find((x) => x.id === customerId);
     if (c) await renderDetail(c);
-    showToast('Visit logged', 1500);
+    showToast(`Visit logged for ${c ? c.company : 'customer'}`, 3000);
   });
 }
 

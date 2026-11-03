@@ -476,7 +476,14 @@ h1, h2, h3 { color: var(--heading); letter-spacing: -0.01em; }
 .field-grid a { color: var(--link); text-decoration: none; }
 .field-grid a:hover { text-decoration: underline; text-underline-offset: 3px; }
 
-.detail-actions { display: flex; gap: var(--s-2); margin-top: var(--s-4); flex-wrap: wrap; }
+.detail-footer {
+  display: flex; gap: var(--s-2); align-items: center;
+  padding: var(--s-3) 18px;
+  border-top: 1px solid var(--border-soft);
+  background: var(--surface);
+}
+.detail-footer .btn-primary { flex: 1; }
+.detail-footer .btn-danger { margin-left: auto; }
 
 .visit {
   border: 1px solid var(--border-soft); border-radius: var(--r-md);
@@ -640,7 +647,9 @@ h1, h2, h3 { color: var(--heading); letter-spacing: -0.01em; }
   #customerList { padding-bottom: env(safe-area-inset-bottom, 0px); }
   .detail-header { padding-top: calc(env(safe-area-inset-top, 0px) + 8px); }
   .detail-header .close { width: 44px; height: 44px; }
-  #detailBody { padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 18px); }
+  #detailBody { padding-bottom: 18px; }
+  .detail-footer { padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 12px); }
+  .detail-footer .btn { min-height: 44px; }
 
   .form-grid { grid-template-columns: 1fr; }
   .field-grid { grid-template-columns: 90px 1fr; }
