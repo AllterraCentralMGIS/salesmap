@@ -630,7 +630,7 @@ function renderVisit(v) {
   const byLabel = by ? by.display_name : '(unknown)';
   return `
     <div class="visit">
-      <button class="visit-delete" id="del-visit-${v.id}" title="Delete visit">remove</button>
+      <button class="visit-delete icon-btn" id="del-visit-${v.id}" title="Delete visit" aria-label="Delete visit"><svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg></button>
       <div class="visit-head">
         <div class="visit-date">${escapeHtml(v.visit_date)}</div>
         ${v.outcome ? `<div class="visit-outcome">${escapeHtml(v.outcome)}</div>` : ''}
@@ -660,9 +660,9 @@ async function deleteVisit(customerId, visitId) {
 function openVisitForm(customerId) {
   const today = new Date().toISOString().slice(0, 10);
   openModal('Log visit', `
-    <div class="form-row"><label>Date</label><input type="date" id="vDate" value="${today}" /></div>
+    <div class="form-row"><label for="vDate">Date</label><input type="date" id="vDate" value="${today}" /></div>
     <div class="form-row">
-      <label>Outcome</label>
+      <label for="vOutcome">Outcome</label>
       <select id="vOutcome">
         <option value="">(none)</option>
         <option>Routine check in</option>
@@ -680,7 +680,7 @@ function openVisitForm(customerId) {
         <option>Business closed / moved</option>
       </select>
     </div>
-    <div class="form-row"><label>Notes</label><textarea id="vNotes" placeholder="What was discussed?"></textarea></div>
+    <div class="form-row"><label for="vNotes">Notes</label><textarea id="vNotes" placeholder="What was discussed?"></textarea></div>
   `, async () => {
     const { error } = await sb.from('visits').insert({
       customer_id: customerId,
@@ -702,27 +702,27 @@ function openVisitForm(customerId) {
 function openCustomerForm(existing) {
   const c = existing || {};
   openModal(existing ? 'Edit customer' : 'New customer', `
-    <div class="form-row"><label>Company</label><input id="fCompany" value="${escapeAttr(c.company)}" /></div>
+    <div class="form-row"><label for="fCompany">Company</label><input id="fCompany" value="${escapeAttr(c.company)}" /></div>
     <div class="form-grid">
-      <div class="form-row"><label>Contact name</label><input id="fContact" value="${escapeAttr(c.contact_name)}" /></div>
-      <div class="form-row"><label>Job title</label><input id="fJobTitle" value="${escapeAttr(c.job_title)}" /></div>
+      <div class="form-row"><label for="fContact">Contact name</label><input id="fContact" value="${escapeAttr(c.contact_name)}" /></div>
+      <div class="form-row"><label for="fJobTitle">Job title</label><input id="fJobTitle" value="${escapeAttr(c.job_title)}" /></div>
     </div>
-    <div class="form-row"><label>Address</label><input id="fAddress" value="${escapeAttr(c.address)}" /></div>
+    <div class="form-row"><label for="fAddress">Address</label><input id="fAddress" value="${escapeAttr(c.address)}" /></div>
     <div class="form-grid">
-      <div class="form-row"><label>City</label><input id="fCity" value="${escapeAttr(c.city)}" /></div>
-      <div class="form-row"><label>State</label><input id="fState" value="${escapeAttr(c.state)}" /></div>
-    </div>
-    <div class="form-grid">
-      <div class="form-row"><label>Post code</label><input id="fPost" value="${escapeAttr(c.post_code)}" /></div>
-      <div class="form-row"><label>Phone</label><input id="fPhone" value="${escapeAttr(c.phone)}" /></div>
+      <div class="form-row"><label for="fCity">City</label><input id="fCity" value="${escapeAttr(c.city)}" /></div>
+      <div class="form-row"><label for="fState">State</label><input id="fState" value="${escapeAttr(c.state)}" /></div>
     </div>
     <div class="form-grid">
-      <div class="form-row"><label>Mobile</label><input id="fMobile" value="${escapeAttr(c.mobile)}" /></div>
-      <div class="form-row"><label>Email</label><input id="fEmail" value="${escapeAttr(c.email)}" /></div>
+      <div class="form-row"><label for="fPost">Post code</label><input id="fPost" value="${escapeAttr(c.post_code)}" /></div>
+      <div class="form-row"><label for="fPhone">Phone</label><input id="fPhone" value="${escapeAttr(c.phone)}" /></div>
     </div>
     <div class="form-grid">
-      <div class="form-row"><label>Salesperson code</label><input id="fSalesperson" value="${escapeAttr(c.salesperson_code)}" /></div>
-      <div class="form-row"><label>Territory code</label><input id="fTerritory" value="${escapeAttr(c.territory_code)}" /></div>
+      <div class="form-row"><label for="fMobile">Mobile</label><input id="fMobile" value="${escapeAttr(c.mobile)}" /></div>
+      <div class="form-row"><label for="fEmail">Email</label><input id="fEmail" value="${escapeAttr(c.email)}" /></div>
+    </div>
+    <div class="form-grid">
+      <div class="form-row"><label for="fSalesperson">Salesperson code</label><input id="fSalesperson" value="${escapeAttr(c.salesperson_code)}" /></div>
+      <div class="form-row"><label for="fTerritory">Territory code</label><input id="fTerritory" value="${escapeAttr(c.territory_code)}" /></div>
     </div>
     <div class="form-row hint">
       Address will be geocoded and a zone assigned automatically when you save.
@@ -809,21 +809,21 @@ function openSettings(firstRun) {
   openModal(firstRun ? 'Welcome to SalesMap' : 'Settings', `
     ${firstRun ? '<p class="hint-top">Paste your TomTom API key to enable the map and geocoding.</p>' : ''}
     <div class="form-row">
-      <label>Display name</label>
+      <label for="sName">Display name</label>
       <input id="sName" value="${escapeAttr(state.profile?.display_name || '')}" />
     </div>
     <div class="form-row">
-      <label>My salesperson code</label>
+      <label for="sCode">My salesperson code</label>
       <input id="sCode" value="${escapeAttr(state.profile?.salesperson_code || '')}" placeholder="e.g. NHOU.007" />
     </div>
     <div class="form-row">
-      <label>TomTom API key</label>
+      <label for="sKey">TomTom API key</label>
       <input id="sKey" value="${escapeAttr(state.tomtomKey || '')}" placeholder="Your TomTom API key" />
     </div>
     <div class="hint">Get a free key at developer.tomtom.com — Maps + Search products.</div>
 
     <div class="form-row mt-4">
-      <label>Theme</label>
+      <label for="sTheme">Theme</label>
       <select id="sTheme">
         <option value="auto">Auto (match system)</option>
         <option value="light">Light</option>
@@ -1316,14 +1316,16 @@ async function importZonesFlow() {
 }
 
 // ============== MODAL / TOAST ==============
+let modalPrevFocus = null;
 function openModal(title, bodyHtml, onSave) {
   const root = document.getElementById('modalRoot');
+  modalPrevFocus = document.activeElement;
   root.innerHTML = `
     <div class="modal-overlay">
-      <div class="modal">
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
         <div class="modal-header">
-          <h2>${escapeHtml(title)}</h2>
-          <button class="close" id="modalClose" title="Close">×</button>
+          <h2 id="modalTitle">${escapeHtml(title)}</h2>
+          <button class="close icon-btn" id="modalClose" title="Close" aria-label="Close"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg></button>
         </div>
         <div class="modal-body">${bodyHtml}</div>
         <div class="modal-footer">
@@ -1335,8 +1337,38 @@ function openModal(title, bodyHtml, onSave) {
   document.getElementById('modalClose').addEventListener('click', closeModal);
   document.getElementById('modalCancel').addEventListener('click', closeModal);
   document.getElementById('modalSave').addEventListener('click', onSave);
+  root.querySelector('.modal-overlay').addEventListener('mousedown', (e) => { if (e.target === e.currentTarget) closeModal(); });
+  const first = root.querySelector('.modal-body input:not([type=hidden]), .modal-body select, .modal-body textarea, .modal-body button')
+    || document.getElementById('modalClose');
+  first.focus();
 }
-function closeModal() { document.getElementById('modalRoot').innerHTML = ''; }
+function closeModal() {
+  document.getElementById('modalRoot').innerHTML = '';
+  if (modalPrevFocus && typeof modalPrevFocus.focus === 'function') modalPrevFocus.focus();
+  modalPrevFocus = null;
+}
+function modalFocusables() {
+  const modal = document.querySelector('#modalRoot .modal');
+  if (!modal) return [];
+  return [...modal.querySelectorAll('a[href], button:not([disabled]), input:not([disabled]):not([type=hidden]), select:not([disabled]), textarea:not([disabled])')]
+    .filter((el) => el.offsetParent !== null);
+}
+// Esc closes the open modal, else the detail panel. Tab stays inside an open modal.
+document.addEventListener('keydown', (e) => {
+  const modalOpen = !!document.querySelector('#modalRoot .modal');
+  if (e.key === 'Escape') {
+    if (modalOpen) { e.preventDefault(); closeModal(); }
+    else if (!document.getElementById('detail').classList.contains('hidden')) { e.preventDefault(); closeDetail(); }
+    return;
+  }
+  if (e.key === 'Tab' && modalOpen) {
+    const items = modalFocusables();
+    if (items.length === 0) return;
+    const firstEl = items[0], lastEl = items[items.length - 1];
+    if (e.shiftKey && document.activeElement === firstEl) { e.preventDefault(); lastEl.focus(); }
+    else if (!e.shiftKey && document.activeElement === lastEl) { e.preventDefault(); firstEl.focus(); }
+  }
+});
 
 let toastTimer = null;
 function showToast(msg, durationMs) {

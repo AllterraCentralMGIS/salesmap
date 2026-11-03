@@ -13,9 +13,19 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700;800&display=swap" />
-  <link rel="stylesheet" href="styles.css?v=13" />
+  <link rel="stylesheet" href="styles.css?v=14" />
 </head>
 <body>
+  <!-- Icon set: 24px stroke icons, drawn once, used with <use> -->
+  <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+    <symbol id="i-settings" viewBox="0 0 24 24"><line x1="21" y1="4" x2="14" y2="4"/><line x1="10" y1="4" x2="3" y2="4"/><line x1="21" y1="12" x2="12" y2="12"/><line x1="8" y1="12" x2="3" y2="12"/><line x1="21" y1="20" x2="16" y2="20"/><line x1="12" y1="20" x2="3" y2="20"/><line x1="14" y1="2" x2="14" y2="6"/><line x1="8" y1="10" x2="8" y2="14"/><line x1="16" y1="18" x2="16" y2="22"/></symbol>
+    <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></symbol>
+    <symbol id="i-list" viewBox="0 0 24 24"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></symbol>
+    <symbol id="i-fit" viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></symbol>
+  </svg>
   <!-- Auth gate -->
   <div id="authScreen" class="auth-screen hidden">
     <div class="auth-card">
@@ -25,22 +35,22 @@
       <div class="auth-sub">Sign in to access your team's customer map.</div>
       <form id="authForm">
         <div class="form-row">
-          <label>Email</label>
+          <label for="authEmail">Email</label>
           <input type="email" id="authEmail" autocomplete="email" required />
         </div>
         <div class="form-row" id="authPasswordRow">
-          <label>Password</label>
+          <label for="authPassword">Password</label>
           <input type="password" id="authPassword" autocomplete="current-password" required />
         </div>
         <button type="submit" class="btn btn-primary" id="authSubmit">Sign in</button>
       </form>
       <form id="pwForm" class="hidden">
         <div class="form-row">
-          <label>New password</label>
+          <label for="pwNew">New password</label>
           <input type="password" id="pwNew" autocomplete="new-password" minlength="8" required />
         </div>
         <div class="form-row">
-          <label>Confirm new password</label>
+          <label for="pwConfirm">Confirm new password</label>
           <input type="password" id="pwConfirm" autocomplete="new-password" minlength="8" required />
         </div>
         <div class="auth-buttons">
@@ -66,21 +76,21 @@
       <div class="sidebar-header">
         <h1><img class="sidebar-logo" src="assets/brand/allterra-logo-white.png" alt="AllTerra SalesMap" /></h1>
         <div class="sidebar-actions">
-          <button id="btnNewCustomer" title="Add a new customer">+ New</button>
-          <button id="btnSettings" title="Settings" aria-label="Settings">⚙</button>
-          <button id="btnSignOut" title="Sign out" aria-label="Sign out">⎋</button>
-          <button id="btnSidebarClose" class="phone-only" title="Back to map" aria-label="Back to map">×</button>
+          <button id="btnNewCustomer" title="Add a new customer"><svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg><span>New</span></button>
+          <button id="btnSettings" class="icon-btn" title="Settings" aria-label="Settings"><svg class="icon" aria-hidden="true"><use href="#i-settings"/></svg></button>
+          <button id="btnSignOut" class="icon-btn" title="Sign out" aria-label="Sign out"><svg class="icon" aria-hidden="true"><use href="#i-logout"/></svg></button>
+          <button id="btnSidebarClose" class="phone-only icon-btn" title="Back to map" aria-label="Back to map"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg></button>
         </div>
       </div>
 
       <div class="filters">
-        <input type="search" id="search" placeholder="Search company, contact, city…" />
+        <input type="search" id="search" placeholder="Search company, contact, city…" aria-label="Search customers" />
         <div class="filter-row">
-          <select id="filterZone"><option value="">All zones</option></select>
-          <select id="filterSalesperson"><option value="">All salespeople</option></select>
+          <select id="filterZone" aria-label="Zone"><option value="">All zones</option></select>
+          <select id="filterSalesperson" aria-label="Salesperson"><option value="">All salespeople</option></select>
         </div>
         <div class="filter-row">
-          <select id="filterRecency">
+          <select id="filterRecency" aria-label="Visit recency">
             <option value="">Any recency</option>
             <option value="never">Never visited</option>
             <option value="90">Not visited in 90+ days</option>
@@ -88,7 +98,7 @@
             <option value="30">Not visited in 30+ days</option>
             <option value="recent">Visited in last 30 days</option>
           </select>
-          <select id="filterVisitor">
+          <select id="filterVisitor" aria-label="Visitor">
             <option value="">All visitors</option>
           </select>
         </div>
@@ -113,13 +123,13 @@
       </div>
 
       <!-- Phone: floating buttons -->
-      <button id="phoneListBtn" class="phone-fab" title="List">≡</button>
-      <button id="recenterBtn" class="recenter-fab" title="Fit map to all customers">⤢</button>
+      <button id="phoneListBtn" class="phone-fab" title="Customer list" aria-label="Customer list"><svg class="icon" aria-hidden="true"><use href="#i-list"/></svg></button>
+      <button id="recenterBtn" class="recenter-fab" title="Fit map to all customers" aria-label="Fit map to all customers"><svg class="icon" aria-hidden="true"><use href="#i-fit"/></svg></button>
     </main>
 
     <aside id="detail" class="hidden">
       <div class="detail-header">
-        <button class="close" id="detailClose">×</button>
+        <button class="close icon-btn" id="detailClose" title="Close" aria-label="Close customer"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg></button>
       </div>
       <div id="detailBody"></div>
     </aside>
@@ -140,7 +150,7 @@
 
   <!-- App -->
   <script src="config.js?v=9"></script>
-  <script src="js/app.js?v=13"></script>
+  <script src="js/app.js?v=14"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
