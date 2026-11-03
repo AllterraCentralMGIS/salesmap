@@ -187,7 +187,7 @@ h1, h2, h3 { color: var(--heading); letter-spacing: -0.01em; }
   font-size: var(--fs-sm);
   font-weight: 600;
   line-height: 1.2;
-  transition: background 120ms ease, border-color 120ms ease, transform 80ms ease;
+  transition: background-color 120ms ease, border-color 120ms ease, transform 80ms ease;
 }
 .btn:hover { background: var(--surface-2); border-color: var(--at-gray-3); }
 .btn:active { transform: translateY(1px); }
@@ -208,6 +208,59 @@ h1, h2, h3 { color: var(--heading); letter-spacing: -0.01em; }
 .mb-4 { margin-bottom: var(--s-4); }
 .mt-4 { margin-top: var(--s-4); }
 .btn-row { display: flex; gap: var(--s-2); flex-wrap: wrap; }
+
+/* Sheet handle: hidden on desktop, the grab bar on the phone */
+.sheet-handle { display: none; }
+
+/* Quick-filter chips */
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  min-height: 30px; padding: 4px 11px;
+  border: 1px solid var(--border); border-radius: 999px;
+  background: var(--surface); color: var(--text-2);
+  font-size: var(--fs-xs); font-weight: 600; line-height: 1;
+  cursor: pointer; white-space: nowrap;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+.chip .icon { width: 14px; height: 14px; }
+.chip:hover { border-color: var(--at-gray-3); }
+.chip.on { background: var(--at-blue-14); border-color: var(--at-blue-14); color: #fff; }
+[data-theme="dark"] .chip.on { background: var(--at-gold-10); border-color: var(--at-gold-10); color: var(--at-blue-14); }
+.chip.busy { opacity: 0.6; }
+.filters-advanced { display: flex; flex-direction: column; gap: var(--s-2); }
+
+/* Quick actions on the customer card */
+.quick-actions { display: flex; gap: var(--s-2); margin: var(--s-3) 0 var(--s-1); }
+.quick-actions a {
+  flex: 1; min-height: 44px;
+  display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  border: 1px solid var(--border-soft); border-radius: var(--r-md);
+  background: var(--surface-2); color: var(--heading);
+  font-size: var(--fs-xs); font-weight: 600; text-decoration: none;
+  transition: background-color 120ms ease;
+}
+.quick-actions a:hover { background: var(--surface-3); }
+.quick-actions a[aria-disabled="true"] { opacity: 0.4; pointer-events: none; }
+.quick-actions .icon { width: 18px; height: 18px; }
+.distance { color: var(--at-blue-11); font-weight: 600; }
+[data-theme="dark"] .distance { color: var(--at-blue-3); }
+
+/* Outcome chips in the Log visit form */
+.outcome-group { margin-bottom: var(--s-2); }
+.outcome-group-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-3); margin: var(--s-2) 0 6px; }
+.outcome-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.outcome-chips input { position: absolute; opacity: 0; width: 0; height: 0; }
+.outcome-chips label { position: relative; }
+.outcome-chips input:focus-visible + .chip { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+/* "You are here" marker */
+.me-pin { width: 16px; height: 16px; border-radius: 50%; background: var(--at-blue-7); border: 3px solid #fff; box-shadow: 0 0 0 2px rgba(54,143,199,0.5), 0 2px 6px rgba(0,0,0,0.3); }
+
+/* Confirm dialog */
+.confirm-body { font-size: var(--fs-md); color: var(--text-2); line-height: 1.5; }
+.confirm-body strong { color: var(--heading); }
+.confirm-body .form-row { margin-top: var(--s-3); }
 
 /* ============== AUTH SCREEN ============== */
 .auth-screen {
@@ -283,7 +336,7 @@ h1, h2, h3 { color: var(--heading); letter-spacing: -0.01em; }
   font-size: var(--fs-sm);
   font-weight: 600;
   white-space: nowrap;
-  transition: background 120ms ease;
+  transition: background-color 120ms ease;
 }
 .sidebar-actions button:hover { background: var(--nav-control-hover); }
 .sidebar-actions button { display: inline-flex; align-items: center; justify-content: center; gap: 4px; }
@@ -333,7 +386,7 @@ h1, h2, h3 { color: var(--heading); letter-spacing: -0.01em; }
   padding: 10px var(--s-4);
   border-bottom: 1px solid var(--border-soft);
   cursor: pointer; display: flex; gap: var(--s-3); align-items: flex-start;
-  transition: background 100ms ease;
+  transition: background-color 100ms ease;
 }
 #customerList li:hover { background: var(--surface-2); }
 #customerList li.static { cursor: default; display: block; }
@@ -405,19 +458,9 @@ h1, h2, h3 { color: var(--heading); letter-spacing: -0.01em; }
 }
 @media (prefers-reduced-motion: reduce) {
   .sm-pin.selected::after { animation: none; display: none; }
-  #sidebar, .btn, .sm-pin { transition: none; }
+  #sidebar, #detail, .btn, .sm-pin, .chip { transition: none; }
 }
 
-.phone-fab .icon { width: 22px; height: 22px; }
-.phone-fab {
-  position: absolute; left: var(--s-4); top: var(--s-4);
-  width: 44px; height: 44px;
-  border: none; border-radius: 50%;
-  background: var(--nav); color: var(--nav-text);
-  box-shadow: var(--shadow-md);
-  display: none;
-  z-index: 5;
-}
 .recenter-fab {
   position: absolute; right: var(--s-4); top: 120px;
   width: 36px; height: 36px;
@@ -449,7 +492,7 @@ h1, h2, h3 { color: var(--heading); letter-spacing: -0.01em; }
   border-radius: var(--r-sm);
   color: var(--text-3);
   padding: 0;
-  transition: background 120ms ease, color 120ms ease;
+  transition: background-color 120ms ease, color 120ms ease;
 }
 .detail-header .close:hover, .modal-header .close:hover { background: var(--surface-3); color: var(--heading); }
 #detailBody { flex: 1; overflow-y: auto; padding: var(--s-4) 18px var(--s-5); }
@@ -531,7 +574,7 @@ h1, h2, h3 { color: var(--heading); letter-spacing: -0.01em; }
 .modal-body { padding: var(--s-4) 18px; overflow-y: auto; }
 .modal-footer { padding: var(--s-3) 18px; border-top: 1px solid var(--border-soft); display: flex; gap: var(--s-2); justify-content: flex-end; }
 .form-row { margin-bottom: var(--s-3); }
-.form-row label { display: block; font-size: var(--fs-xs); color: var(--text-2); margin-bottom: 4px; font-weight: 600; }
+.form-row label, .form-label { display: block; font-size: var(--fs-xs); color: var(--text-2); margin-bottom: 4px; font-weight: 600; }
 .form-row textarea { resize: vertical; min-height: 72px; }
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 
@@ -585,27 +628,47 @@ h1, h2, h3 { color: var(--heading); letter-spacing: -0.01em; }
   #app { grid-template-columns: 1fr; grid-template-rows: 1fr; }
   #app.with-detail { grid-template-columns: 1fr; }
 
-  #sidebar {
-    position: fixed;
-    left: 0; right: 0; top: 0; bottom: 0;
-    height: 100vh;
-    height: 100dvh;
-    z-index: 400;  /* above pins and TomTom controls; below detail */
-    transform: translateY(105%);
-    transition: transform 240ms cubic-bezier(0.2, 0.8, 0.2, 1);
-    border-right: none;
-    box-shadow: var(--shadow-lg);
+  /* The list and the customer card are bottom sheets over the map */
+  .sheet-handle {
+    display: flex; align-items: center; justify-content: center;
+    width: 100%; height: 22px; padding: 0; border: none; background: transparent;
+    cursor: grab; touch-action: none; flex-shrink: 0;
   }
-  #app.sidebar-open #sidebar { transform: translateY(0); }
+  .sheet-handle span { width: 40px; height: 5px; border-radius: 3px; background: var(--at-gray-3); opacity: 0.7; }
+  #sidebar, #detail {
+    position: fixed;
+    left: 0; right: 0; bottom: 0; top: auto;
+    height: var(--sheet-h, 50dvh);
+    max-height: 100dvh;
+    border-radius: var(--r-lg) var(--r-lg) 0 0;
+    border-right: none; border-left: none;
+    box-shadow: 0 -8px 28px rgba(0, 10, 24, 0.35);
+    transition: height 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    overflow: hidden;
+  }
+  #sidebar.dragging, #detail.dragging { transition: none; }
+  #sidebar { z-index: 400; }
+  #detail { z-index: 500; }
+  #sidebar[data-sheet="peek"] { --sheet-h: calc(env(safe-area-inset-bottom, 0px) + 186px); }
+  #sidebar[data-sheet="half"] { --sheet-h: 56dvh; }
+  #sidebar[data-sheet="full"] { --sheet-h: calc(100dvh - env(safe-area-inset-top, 0px) - 8px); }
+  #detail[data-sheet="peek"] { --sheet-h: calc(env(safe-area-inset-bottom, 0px) + 150px); }
+  #detail[data-sheet="half"] { --sheet-h: 62dvh; }
+  #detail[data-sheet="full"] { --sheet-h: calc(100dvh - env(safe-area-inset-top, 0px) - 8px); }
 
-  #detail {
-    position: fixed;
-    left: 0; right: 0; top: 0; bottom: 0;
-    height: 100vh;
-    height: 100dvh;
-    z-index: 500;  /* must beat selected pin's 100 + any TomTom control z-index */
-    border-left: none;
-  }
+  /* Peek shows only search + chips: the header folds away */
+  #sidebar .sidebar-header { order: 3; padding: 10px var(--s-3); }
+  #sidebar .filters { order: 1; border-bottom: none; padding-bottom: var(--s-2); }
+  #sidebar #customerList { order: 2; }
+  #sidebar .sidebar-header { border-top: 1px solid var(--border-soft); }
+  #sidebar .sheet-handle { order: 0; }
+  #sidebar[data-sheet="peek"] #customerList, #sidebar[data-sheet="peek"] .sidebar-header { display: none; }
+  #sidebar[data-sheet="peek"] .filters-advanced { display: none; }
+  .sidebar-logo { height: 22px; }
+
+  #detail .detail-header { padding: 0 var(--s-2) 0; border-bottom: none; margin-top: -22px; position: relative; z-index: 1; pointer-events: none; }
+  #detail .detail-header .close { pointer-events: auto; width: 44px; height: 44px; }
+  #detail[data-sheet="peek"] #detailBody { overflow: hidden; }
 
   .sidebar-actions button { min-height: 40px; min-width: 40px; }
   .sidebar-logo { height: 22px; }
@@ -613,11 +676,6 @@ h1, h2, h3 { color: var(--heading); letter-spacing: -0.01em; }
   
   /* Floating controls — respect iOS safe areas, with minimum offsets so
      they always clear the status bar / dynamic island */
-  .phone-fab {
-    display: flex; align-items: center; justify-content: center;
-    top: max(calc(env(safe-area-inset-top, 0px) + 12px), 60px);
-    left: max(calc(env(safe-area-inset-left, 0px) + 12px), 12px);
-  }
   .recenter-fab {
     /* Top-right, stacked BELOW TomTom's nav + locate stack (~180px tall) */
     top: max(calc(env(safe-area-inset-top, 0px) + 220px), 240px);
@@ -631,17 +689,10 @@ h1, h2, h3 { color: var(--heading); letter-spacing: -0.01em; }
     top: max(calc(env(safe-area-inset-top, 0px) + 8px), 56px) !important;
     right: max(calc(env(safe-area-inset-right, 0px) + 8px), 8px) !important;
   }
-  #legend {
-    right: max(calc(env(safe-area-inset-right, 0px) + 8px), 8px);
-    bottom: max(calc(env(safe-area-inset-bottom, 0px) + 28px), 28px);
-    font-size: 11px; padding: 8px 10px;
-  }
+  #legend { display: none; } /* the chips carry the recency language on the phone */
 
   /* Inside the sidebar/detail, pad for notch + home indicator */
-  .sidebar-header { padding-top: calc(env(safe-area-inset-top, 0px) + 14px); }
   #customerList { padding-bottom: env(safe-area-inset-bottom, 0px); }
-  .detail-header { padding-top: calc(env(safe-area-inset-top, 0px) + 8px); }
-  .detail-header .close { width: 44px; height: 44px; }
   #detailBody { padding-bottom: 18px; }
   .detail-footer { padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 12px); }
   .detail-footer .btn { min-height: 44px; }

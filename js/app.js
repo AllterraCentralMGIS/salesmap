@@ -18,6 +18,7 @@ const state = {
   zones: [],
   selectedId: null,
   selectedMarker: null,
+  me: null, meMarker: null, nearMe: false, myCode: null,
   zoneLayers: [],
   map: null,
   filters: { q: '', zoneId: '', salesperson: '', recency: '', visitor: '', viewport: false },
@@ -206,6 +207,7 @@ async function onSignedIn(user) {
   await refreshAll();
   // First view is the rep's own customers; "All salespeople" is one tap away
   const myCode = state.profile && state.profile.salesperson_code;
+  state.myCode = myCode || null;
   if (myCode && state.customers.some((c) => c.salesperson_code === myCode)) {
     state.filters.salesperson = myCode;
     document.getElementById('filterSalesperson').value = myCode;
@@ -255,13 +257,19 @@ function bindAppUI() {
   document.getElementById('btnLogVisit').addEventListener('click', () => { if (state.selectedId != null) openVisitForm(state.selectedId); });
   document.getElementById('btnEditCustomer').addEventListener('click', () => { const c = selected(); if (c) openCustomerForm(c); });
   document.getElementById('btnDeleteCustomer').addEventListener('click', () => { const c = selected(); if (c) deleteCustomer(c); });
-  document.getElementById('phoneListBtn').addEventListener('click', () => {
-    document.getElementById('app').classList.toggle('sidebar-open');
-  });
+  const sidebar = document.getElementById('sidebar');
   const sbClose = document.getElementById('btnSidebarClose');
-  if (sbClose) sbClose.addEventListener('click', () => {
-    document.getElementById('app').classList.remove('sidebar-open');
+  if (sbClose) sbClose.addEventListener('click', () => setSheet(sidebar, 'peek'));
+  sheetDrag(document.getElementById('sheetHandle'), sidebar);
+  sheetDrag(document.getElementById('detailHandle'), document.getElementById('detail'));
+  document.getElementById('search').addEventListener('focus', () => {
+    if (isPhone() && sidebar.dataset.sheet === 'peek') setSheet(sidebar, 'half');
   });
+  document.getElementById('chips').addEventListener('click', (e) => {
+    const chip = e.target.closest('[data-chip]');
+    if (chip) onChip(chip.dataset.chip);
+  });
+  renderChips();
   const recenter = document.getElementById('recenterBtn');
   if (recenter) recenter.addEventListener('click', () => fitMapToCustomers());
 }
@@ -641,9 +649,13 @@ function filtersActive() {
 async function deleteFiltered() {
   const filtered = applyFilters(state.customers);
   if (filtered.length === 0) return;
-  const typed = prompt(`Delete ${filtered.length} customer${filtered.length === 1 ? '' : 's'} matching the current filters?\n\nThis also deletes their visit history and cannot be undone.\nType ${filtered.length} to confirm.`);
-  if (typed === null) return;
-  if (typed.trim() !== String(filtered.length)) { showToast('Not deleted: the number did not match.', 3000); return; }
+  const n = filtered.length;
+  const ok = await confirmDialog({
+    title: `Delete ${n} customer${n === 1 ? '' : 's'}?`,
+    message: `These are the customers matching the current filters. Their visit history goes with them, and it cannot be undone.`,
+    confirmLabel: 'Delete', danger: true, typed: String(n),
+  });
+  if (!ok) return;
   const ids = filtered.map((c) => c.id);
   const { error } = await sb.from('customers').delete().in('id', ids);
   if (error) { showToast(`Delete failed: ${error.message}`, 5000); return; }
@@ -678,8 +690,13 @@ function renderList() {
     document.getElementById('emptyClear').addEventListener('click', clearFilters);
     return;
   }
+  let rows = filtered;
+  if (state.nearMe && state.me) {
+    rows = filtered.map((c) => ({ c, d: isReasonableCoord(c.lat, c.lng) ? distanceMiles(state.me, c) : Infinity }))
+      .sort((a, b) => a.d - b.d).map((x) => x.c);
+  }
   const frag = document.createDocumentFragment();
-  for (const c of filtered) {
+  for (const c of rows) {
     const li = document.createElement('li');
     li.dataset.id = c.id;
     li.tabIndex = 0;
@@ -690,17 +707,23 @@ function renderList() {
       <div class="info">
         <div class="name">${escapeHtml(c.company || '(no name)')}</div>
         <div class="sub">${escapeHtml(c.contact_name || '')} · ${escapeHtml(c.city || '')}</div>
-        <div class="meta">${c.zone_name ? escapeHtml(c.zone_name) : 'No zone'} · ${c.last_visit_date ? `Last visit ${escapeHtml(c.last_visit_date)}` : 'Never visited'}</div>
+        <div class="meta">${metaLine(c)}</div>
       </div>`;
     frag.appendChild(li);
   }
   ul.replaceChildren(frag);
+  renderChips();
+}
+function metaLine(c) {
+  const parts = [];
+  if (state.nearMe && state.me && isReasonableCoord(c.lat, c.lng)) parts.push(`<span class="distance">${distanceMiles(state.me, c).toFixed(1)} mi</span>`);
+  if (c.zone_name) parts.push(escapeHtml(c.zone_name));
+  parts.push(c.last_visit_date ? `Last visit ${escapeHtml(c.last_visit_date)}` : 'Never visited');
+  return parts.join(' · ');
 }
 // One click/keyboard handler for the whole list (rows carry data-id)
 function pickRow(li) {
   selectCustomer(Number(li.dataset.id), true);
-  // On phone, close the sidebar overlay when picking
-  document.getElementById('app').classList.remove('sidebar-open');
 }
 document.getElementById('customerList').addEventListener('click', (e) => {
   const li = e.target.closest('li[data-id]');
@@ -739,6 +762,11 @@ async function selectCustomer(id, panTo) {
   await renderDetail(c);
   document.getElementById('app').classList.add('with-detail');
   document.getElementById('detail').classList.remove('hidden');
+  if (isPhone()) {
+    setSheet(document.getElementById('sidebar'), 'peek');
+    setSheet(document.getElementById('detail'), 'half');
+    document.getElementById('detailBody').scrollTop = 0;
+  }
 }
 
 function closeDetail() {
@@ -770,10 +798,19 @@ async function renderDetail(c) {
     row('Customer #', escapeHtml(c.customer_no || '')),
   ].join('');
   const n = (visits || []).length;
+  const phone = c.phone || c.mobile;
+  const nav = navigateUrl(c);
+  const action = (href, icon, label) => `<a href="${href ? escapeAttr(href) : '#'}" ${href ? 'target="_blank" rel="noopener"' : 'aria-disabled="true"'}><svg class="icon" aria-hidden="true"><use href="#i-${icon}"/></svg>${label}</a>`;
+  const dist = state.me && isReasonableCoord(c.lat, c.lng) ? `<span class="distance">${distanceMiles(state.me, c).toFixed(1)} mi away</span>` : '';
   body.innerHTML = `
     <h2 class="detail-title">${escapeHtml(c.company || '(no name)')}</h2>
-    <div class="detail-sub">${escapeHtml(c.contact_name || '')}</div>
+    <div class="detail-sub">${escapeHtml(c.contact_name || '')}${dist ? (c.contact_name ? ' · ' : '') + dist : ''}</div>
     ${c.zone_name ? `<div class="detail-zone-pill" style="${c.zone_color ? `--zone:${escapeAttr(c.zone_color)}` : ''}">${escapeHtml(c.zone_name)}</div>` : ''}
+    <div class="quick-actions">
+      ${action(phone ? `tel:${phone}` : null, 'phone', 'Call')}
+      ${action(nav, 'navigate', 'Navigate')}
+      ${action(c.email ? `mailto:${c.email}` : null, 'mail', 'Email')}
+    </div>
 
     <div class="detail-section">
       <h3>Contact</h3>
@@ -809,7 +846,8 @@ function renderVisit(v) {
 }
 
 async function deleteCustomer(c) {
-  if (!confirm(`Delete ${c.company}? This also deletes all visit history.`)) return;
+  const ok = await confirmDialog({ title: `Delete ${c.company || 'this customer'}?`, message: 'The visit history goes with it. This cannot be undone.', confirmLabel: 'Delete', danger: true });
+  if (!ok) return;
   const { error } = await sb.from('customers').delete().eq('id', c.id);
   if (error) { showToast(`Delete failed: ${error.message}`, 5000); return; }
   closeDetail(); await refreshAll();
@@ -817,7 +855,8 @@ async function deleteCustomer(c) {
 }
 
 async function deleteVisit(customerId, visitId) {
-  if (!confirm('Remove this visit from the history? This cannot be undone.')) return;
+  const ok = await confirmDialog({ title: 'Remove this visit?', message: 'It leaves the history for good.', confirmLabel: 'Remove', danger: true });
+  if (!ok) return;
   const { error } = await sb.from('visits').delete().eq('id', visitId);
   if (error) { showToast(`Delete failed: ${error.message}`, 5000); return; }
   await refreshAll();
@@ -831,29 +870,10 @@ function openVisitForm(customerId) {
   openModal('Log visit', `
     <div class="form-row"><label for="vDate">Date</label><input type="date" id="vDate" value="${today}" /></div>
     <div class="form-row">
-      <label for="vOutcome">Outcome</label>
-      <select id="vOutcome">
-        <option value="">Not recorded</option>
-        <optgroup label="Contact">
-          <option>Routine check in</option>
-          <option>Met with decision-maker</option>
-          <option>Met with gatekeeper</option>
-          <option>Decision-maker not in</option>
-          <option>Dropped off card / literature</option>
-        </optgroup>
-        <optgroup label="Progress">
-          <option>Scheduled follow-up appointment</option>
-          <option>Quote requested</option>
-          <option>Demo scheduled</option>
-          <option>Training</option>
-          <option>Delivery</option>
-          <option>Closed sale</option>
-        </optgroup>
-        <optgroup label="Outcome">
-          <option>Not interested</option>
-          <option>Business closed / moved</option>
-        </optgroup>
-      </select>
+      <span class="form-label">Outcome</span>
+      <div id="vOutcome">
+        ${outcomeChips()}
+      </div>
     </div>
     <div class="form-row"><label for="vNotes">Notes</label><textarea id="vNotes" placeholder="What was discussed?"></textarea></div>
   `, async () => {
@@ -861,7 +881,7 @@ function openVisitForm(customerId) {
       customer_id: customerId,
       visitor_id: state.user.id,
       visit_date: document.getElementById('vDate').value,
-      outcome: document.getElementById('vOutcome').value || null,
+      outcome: (document.querySelector('input[name="vOutcome"]:checked') || {}).value || null,
       notes: document.getElementById('vNotes').value || null,
     });
     if (error) { showToast(`Save failed: ${error.message}`, 5000); return; }
@@ -1036,15 +1056,23 @@ function openSettings(firstRun) {
     const name = getVal('sName');
     const code = getVal('sCode');
     const theme = document.getElementById('sTheme').value || DEFAULT_THEME;
+    const keyChanged = key !== (state.tomtomKey || '');
     localStorage.setItem('tomtom_api_key', key);
     localStorage.setItem('theme', theme);
+    applyTheme(theme);
     state.tomtomKey = key;
     await sb.from('profiles').update({ display_name: name || state.profile.display_name, salesperson_code: code }).eq('id', state.user.id);
     const { data: prof } = await sb.from('profiles').select('*').eq('id', state.user.id).single();
     state.profile = prof;
+    state.myCode = (prof && prof.salesperson_code) || null;
     closeModal();
-    showToast('Saved. Reloading…', 1200);
-    setTimeout(() => location.reload(), 800);
+    renderList();
+    if (keyChanged) {
+      showToast('Saved. Reloading the map…', 1200);
+      setTimeout(() => location.reload(), 800);
+    } else {
+      showToast('Saved', 1500);
+    }
   });
 
   // Pre-select current theme
@@ -1061,8 +1089,9 @@ function openSettings(firstRun) {
 
   const clearBtn = document.getElementById('sClearAll');
   if (clearBtn) clearBtn.addEventListener('click', async () => {
-    if (!confirm('Delete ALL customers and visit history? Cannot be undone.')) return;
-    if (!confirm('Really sure?')) return;
+    closeModal();
+    const ok = await confirmDialog({ title: 'Delete all customers and visits?', message: 'Everything except zones is removed from the shared map, for every rep. This cannot be undone.', confirmLabel: 'Delete everything', danger: true, typed: 'DELETE' });
+    if (!ok) return;
     const { error: e1 } = await sb.from('visits').delete().neq('id', 0);
     const { error: e2 } = await sb.from('customers').delete().neq('id', 0);
     if (e1 || e2) { showToast(`Delete failed: ${(e1 || e2).message}`, 5000); return; }
@@ -1504,7 +1533,7 @@ async function importZonesFlow() {
 
 // ============== MODAL / TOAST ==============
 let modalPrevFocus = null;
-function openModal(title, bodyHtml, onSave) {
+function openModal(title, bodyHtml, onSave, opts = {}) {
   const root = document.getElementById('modalRoot');
   modalPrevFocus = document.activeElement;
   root.innerHTML = `
@@ -1517,7 +1546,7 @@ function openModal(title, bodyHtml, onSave) {
         <div class="modal-body">${bodyHtml}</div>
         <div class="modal-footer">
           <button class="btn" id="modalCancel">Cancel</button>
-          <button class="btn btn-primary" id="modalSave">Save</button>
+          <button class="btn ${opts.danger ? 'btn-danger' : 'btn-primary'}" id="modalSave">${escapeHtml(opts.saveLabel || 'Save')}</button>
         </div>
       </div>
     </div>`;
@@ -1575,6 +1604,158 @@ function showToast(msg, durationMs) {
 function hideToast() { document.getElementById('toast').classList.add('hidden'); }
 
 // ============== HELPERS ==============
+// ============== PHONE SHEETS, CHIPS, NEAR ME ==============
+function isPhone() { return window.matchMedia('(max-width: 900px)').matches; }
+function setSheet(el, st) { el.dataset.sheet = st; el.style.height = ''; }
+const SHEET_ORDER = ['peek', 'half', 'full'];
+function sheetDrag(handle, el) {
+  if (!handle) return;
+  let startY = 0, startH = 0, dragging = false;
+  handle.addEventListener('pointerdown', (e) => {
+    if (!isPhone()) return;
+    dragging = true; startY = e.clientY; startH = el.getBoundingClientRect().height;
+    el.classList.add('dragging');
+    handle.setPointerCapture(e.pointerId);
+  });
+  handle.addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    const h = Math.max(80, Math.min(window.innerHeight, startH + (startY - e.clientY)));
+    el.style.height = h + 'px';
+  });
+  const end = (e) => {
+    if (!dragging) return;
+    dragging = false; el.classList.remove('dragging');
+    const tapped = Math.abs(e.clientY - startY) < 6;
+    if (tapped) { cycleSheet(el); return; }
+    const h = el.getBoundingClientRect().height, vh = window.innerHeight;
+    setSheet(el, h < vh * 0.35 ? 'peek' : h < vh * 0.8 ? 'half' : 'full');
+  };
+  handle.addEventListener('pointerup', end);
+  handle.addEventListener('pointercancel', end);
+  handle.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); cycleSheet(el); } });
+}
+function cycleSheet(el) {
+  const i = SHEET_ORDER.indexOf(el.dataset.sheet || 'peek');
+  setSheet(el, SHEET_ORDER[(i + 1) % SHEET_ORDER.length]);
+}
+
+const CHIPS = [
+  { id: 'mine', label: 'My customers' },
+  { id: 'never', label: 'Never visited' },
+  { id: 'stale', label: '90+ days' },
+  { id: 'near', label: 'Near me', icon: 'locate' },
+  { id: 'more', label: 'Filters', icon: 'settings' },
+];
+function chipOn(id) {
+  const f = state.filters;
+  if (id === 'mine') return !!state.myCode && f.salesperson === state.myCode;
+  if (id === 'never') return f.recency === 'never';
+  if (id === 'stale') return f.recency === '90';
+  if (id === 'near') return state.nearMe;
+  if (id === 'more') return !document.getElementById('filtersAdvanced').classList.contains('hidden');
+  return false;
+}
+function renderChips() {
+  const el = document.getElementById('chips');
+  if (!el) return;
+  el.innerHTML = CHIPS.filter((c) => c.id !== 'mine' || state.myCode).map((c) => {
+    const on = chipOn(c.id);
+    const busy = c.id === 'near' && state._locating;
+    return `<button type="button" class="chip${on ? ' on' : ''}${busy ? ' busy' : ''}" data-chip="${c.id}" aria-pressed="${on}">` +
+      (c.icon ? `<svg class="icon" aria-hidden="true"><use href="#i-${c.icon}"/></svg>` : '') +
+      (busy ? 'Locating…' : c.label) + '</button>';
+  }).join('');
+}
+function onChip(id) {
+  const f = state.filters;
+  if (id === 'mine') {
+    f.salesperson = chipOn('mine') ? '' : state.myCode;
+    document.getElementById('filterSalesperson').value = f.salesperson;
+  } else if (id === 'never' || id === 'stale') {
+    const val = id === 'never' ? 'never' : '90';
+    f.recency = f.recency === val ? '' : val;
+    document.getElementById('filterRecency').value = f.recency;
+  } else if (id === 'near') {
+    toggleNearMe(); return;
+  } else if (id === 'more') {
+    document.getElementById('filtersAdvanced').classList.toggle('hidden');
+    renderChips(); return;
+  }
+  renderList(); renderMarkers();
+}
+
+function distanceMiles(a, b) {
+  const R = 3958.8, toR = (x) => x * Math.PI / 180;
+  const dLat = toR(b.lat - a.lat), dLng = toR(b.lng - a.lng);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(toR(a.lat)) * Math.cos(toR(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+function toggleNearMe() {
+  if (state.nearMe) { state.nearMe = false; renderList(); return; }
+  if (!navigator.geolocation) { showToast('Location is not available on this device.', 3000); return; }
+  state._locating = true; renderChips();
+  navigator.geolocation.getCurrentPosition((pos) => {
+    state.me = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+    state.nearMe = true; state._locating = false;
+    renderList(); showMeMarker();
+    if (state.map) state.map.flyTo({ center: [state.me.lng, state.me.lat], zoom: Math.max(state.map.getZoom(), 10.5) });
+  }, (err) => {
+    state._locating = false; renderChips();
+    showToast(err && err.code === 1
+      ? 'Location permission was denied. Allow it for this site to use Near me.'
+      : 'Could not get your location. Try again outdoors.', 4000);
+  }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 });
+}
+function showMeMarker() {
+  if (!state.map || !state.me) return;
+  const ll = [state.me.lng, state.me.lat];
+  if (state.meMarker) { state.meMarker.setLngLat(ll); return; }
+  const el = document.createElement('div');
+  el.className = 'me-pin'; el.title = 'You are here';
+  state.meMarker = new tt.Marker({ element: el }).setLngLat(ll).addTo(state.map);
+}
+// Opens the phone's own maps app; Google Maps on a desktop
+function navigateUrl(c) {
+  const hasPt = isReasonableCoord(c.lat, c.lng);
+  const addr = [c.address, c.city, c.state, c.post_code].filter(Boolean).join(', ');
+  if (!hasPt && !addr) return null;
+  const dest = hasPt ? `${c.lat},${c.lng}` : encodeURIComponent(addr);
+  const ua = navigator.userAgent;
+  if (/iPhone|iPad|iPod/.test(ua)) return `https://maps.apple.com/?daddr=${dest}`;
+  if (/Android/.test(ua)) return hasPt ? `geo:${dest}?q=${dest}` : `geo:0,0?q=${dest}`;
+  return `https://www.google.com/maps/dir/?api=1&destination=${dest}`;
+}
+
+const OUTCOME_GROUPS = [
+  ['Contact', ['Routine check in', 'Met with decision-maker', 'Met with gatekeeper', 'Decision-maker not in', 'Dropped off card / literature']],
+  ['Progress', ['Scheduled follow-up appointment', 'Quote requested', 'Demo scheduled', 'Training', 'Delivery', 'Closed sale']],
+  ['Outcome', ['Not interested', 'Business closed / moved']],
+];
+function outcomeChips() {
+  const chip = (value, label, checked) =>
+    `<label><input type="radio" name="vOutcome" value="${escapeAttr(value)}"${checked ? ' checked' : ''} /><span class="chip">${escapeHtml(label)}</span></label>`;
+  return `<div class="outcome-chips">${chip('', 'Not recorded', true)}</div>` +
+    OUTCOME_GROUPS.map(([g, items]) => `<div class="outcome-group"><div class="outcome-group-label">${g}</div><div class="outcome-chips">${items.map((o) => chip(o, o, false)).join('')}</div></div>`).join('');
+}
+
+// Themed yes/no dialog. Resolves true on confirm, false on cancel, close or Esc.
+function confirmDialog({ title, message, confirmLabel = 'Confirm', danger = false, typed = null }) {
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = (v) => { if (!done) { done = true; resolve(v); } };
+    const typedRow = typed
+      ? `<div class="form-row"><label for="confirmTyped">Type <strong>${escapeHtml(typed)}</strong> to confirm</label><input id="confirmTyped" autocomplete="off" autocapitalize="off" /></div>`
+      : '';
+    openModal(title, `<div class="confirm-body">${escapeHtml(message)}${typedRow}</div>`, async () => {
+      if (typed && (getVal('confirmTyped') || '') !== typed) { showToast('That did not match.', 2500); return; }
+      finish(true); closeModal();
+    }, { saveLabel: confirmLabel, danger });
+    const root = document.getElementById('modalRoot');
+    const obs = new MutationObserver(() => { if (!root.querySelector('.modal')) { obs.disconnect(); finish(false); } });
+    obs.observe(root, { childList: true });
+  });
+}
+
 function debounce(fn, ms) {
   let t = null;
   return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
