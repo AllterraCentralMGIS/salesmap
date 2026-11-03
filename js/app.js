@@ -459,11 +459,30 @@ function fitMapToCustomers(opts) {
   }
   const bounds = new tt.LngLatBounds();
   for (const c of pts) bounds.extend([c.lng, c.lat]);
-  const isPhone = window.innerWidth < 900;
+  const phone = isPhone();
   state.map.fitBounds(bounds, {
-    padding: isPhone ? 28 : 80,
-    maxZoom: isPhone ? 12 : 11,
+    padding: phone ? { top: 60, left: 28, right: 64, bottom: coveredBottom() + 24 } : 80,
+    maxZoom: phone ? 12 : 11,
   });
+}
+// Height of the map hidden behind the bottom sheets on the phone (0 on desktop).
+// Uses the sheet's resting height for its current state, not a mid-transition height.
+function coveredBottom() {
+  if (!isPhone()) return 0;
+  const vh = window.innerHeight;
+  const restH = (el) => {
+    if (!el || el.classList.contains('hidden')) return 0;
+    const st = el.dataset.sheet || 'peek';
+    if (st === 'full') return vh;
+    if (el.id === 'detail') return st === 'half' ? vh * 0.62 : 150;
+    return st === 'half' ? vh * 0.56 : 186;
+  };
+  return Math.min(vh * 0.7, Math.max(restH(document.getElementById('sidebar')), restH(document.getElementById('detail'))));
+}
+// Pan so a point sits in the middle of the map area that is still visible
+function flyToVisible(lngLat, zoom) {
+  const offsetY = -coveredBottom() / 2;
+  state.map.flyTo({ center: lngLat, zoom, offset: [0, offsetY] });
 }
 
 // ============== DATA LAYER (Supabase) ==============
@@ -756,9 +775,6 @@ async function selectCustomer(id, panTo) {
   setSelectedRow(prev, id); setSelectedPin(prev, id);
   const c = state.customers.find((x) => x.id === id);
   if (!c) return;
-  if (panTo && state.map && c.lat != null && c.lng != null) {
-    state.map.flyTo({ center: [c.lng, c.lat], zoom: Math.max(state.map.getZoom(), 11) });
-  }
   await renderDetail(c);
   document.getElementById('app').classList.add('with-detail');
   document.getElementById('detail').classList.remove('hidden');
@@ -766,6 +782,10 @@ async function selectCustomer(id, panTo) {
     setSheet(document.getElementById('sidebar'), 'peek');
     setSheet(document.getElementById('detail'), 'half');
     document.getElementById('detailBody').scrollTop = 0;
+  }
+  // On the phone a tapped pin can sit behind the card, so pan for map taps too
+  if ((panTo || isPhone()) && state.map && isReasonableCoord(c.lat, c.lng)) {
+    flyToVisible([c.lng, c.lat], Math.max(state.map.getZoom(), panTo ? 11 : state.map.getZoom()));
   }
 }
 
@@ -1698,7 +1718,7 @@ function toggleNearMe() {
     state.me = { lat: pos.coords.latitude, lng: pos.coords.longitude };
     state.nearMe = true; state._locating = false;
     renderList(); showMeMarker();
-    if (state.map) state.map.flyTo({ center: [state.me.lng, state.me.lat], zoom: Math.max(state.map.getZoom(), 10.5) });
+    if (state.map) flyToVisible([state.me.lng, state.me.lat], Math.max(state.map.getZoom(), 10.5));
   }, (err) => {
     state._locating = false; renderChips();
     showToast(err && err.code === 1
