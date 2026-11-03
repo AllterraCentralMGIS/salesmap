@@ -10,7 +10,7 @@
   <link rel="icon" type="image/svg+xml" href="icons/icon.svg" />
   <link rel="apple-touch-icon" href="icons/icon-192.png" />
   <link rel="stylesheet" href="https://api.tomtom.com/maps-sdk-for-web/cdn/6.x/6.25.0/maps/maps.css" />
-  <link rel="stylesheet" href="styles.css?v=10" />
+  <link rel="stylesheet" href="styles.css?v=11" />
 </head>
 <body>
   <!-- Auth gate -->
@@ -29,8 +29,22 @@
         </div>
         <button type="submit" class="btn btn-primary" id="authSubmit">Sign in</button>
       </form>
-      <div class="auth-footnote">
-        First time? Use the temporary password from your invite email; you'll be prompted to set a new one.
+      <form id="pwForm" class="hidden">
+        <div class="form-row">
+          <label>New password</label>
+          <input type="password" id="pwNew" autocomplete="new-password" minlength="8" required />
+        </div>
+        <div class="form-row">
+          <label>Confirm new password</label>
+          <input type="password" id="pwConfirm" autocomplete="new-password" minlength="8" required />
+        </div>
+        <div class="auth-buttons">
+          <button type="submit" class="btn btn-primary" id="pwSubmit">Save password</button>
+          <button type="button" class="btn hidden" id="pwCancel">Cancel</button>
+        </div>
+      </form>
+      <div class="auth-footnote" id="authFootnote">
+        First time? Open your invite email and click its link; you'll be asked to choose a password.
         <br/>Forgot your password? <a href="#" id="authForgot">Email me a reset link</a>.
       </div>
       <div id="authMsg" class="auth-msg"></div>
@@ -117,7 +131,7 @@
 
   <!-- App -->
   <script src="config.js?v=9"></script>
-  <script src="js/app.js?v=10"></script>
+  <script src="js/app.js?v=11"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {

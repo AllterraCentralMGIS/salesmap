@@ -36,6 +36,7 @@ button { font-family: inherit; }
 .auth-msg { margin-top: 12px; font-size: 13px; min-height: 20px; }
 .auth-msg.error { color: #b91c1c; }
 .auth-msg.success { color: #15803d; }
+.auth-buttons { display: flex; gap: 8px; }
 
 /* ============== APP LAYOUT ============== */
 #app {

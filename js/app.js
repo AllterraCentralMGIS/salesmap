@@ -3,6 +3,11 @@
 'use strict';
 
 const CFG = window.SALESMAP_CONFIG;
+// Read invite/reset link details before the Supabase client consumes the URL hash
+const AUTH_LINK = (() => {
+  const p = new URLSearchParams(location.hash.slice(1) || location.search.slice(1));
+  return { type: p.get('type'), error: p.get('error_description') };
+})();
 const sb = supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY);
 
 const state = {
@@ -55,13 +60,21 @@ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () 
 document.addEventListener('DOMContentLoaded', async () => {
   bindAuthUI();
   const { data: { session } } = await sb.auth.getSession();
-  if (session) {
+  if (session && (AUTH_LINK.type === 'invite' || AUTH_LINK.type === 'recovery')) {
+    showSetPassword('link');
+  } else if (session) {
     await onSignedIn(session.user);
   } else {
     showAuthScreen();
+    if (AUTH_LINK.error) {
+      const msg = document.getElementById('authMsg');
+      msg.textContent = `${AUTH_LINK.error.replace(/\+/g, ' ')}. Ask for a new link, or use "Email me a reset link".`;
+      msg.className = 'auth-msg error';
+    }
   }
   sb.auth.onAuthStateChange((event, session) => {
     if (event === 'SIGNED_OUT') location.reload();
+    if (event === 'PASSWORD_RECOVERY') showSetPassword('link');
   });
 });
 
@@ -108,6 +121,69 @@ function bindAuthUI() {
     msg.textContent = error ? error.message : 'Check your email for a reset link.';
     msg.className = error ? 'auth-msg error' : 'auth-msg success';
   });
+
+  document.getElementById('pwForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const pw = document.getElementById('pwNew').value;
+    const msg = document.getElementById('authMsg');
+    if (pw.length < 8) {
+      msg.textContent = 'Use at least 8 characters.';
+      msg.className = 'auth-msg error';
+      return;
+    }
+    if (pw !== document.getElementById('pwConfirm').value) {
+      msg.textContent = 'The two passwords don\'t match.';
+      msg.className = 'auth-msg error';
+      return;
+    }
+    msg.textContent = 'Saving…';
+    msg.className = 'auth-msg';
+    const { data, error } = await sb.auth.updateUser({ password: pw });
+    if (error) {
+      msg.textContent = error.message;
+      msg.className = 'auth-msg error';
+      return;
+    }
+    const mode = pwMode;
+    hideSetPassword();
+    if (mode === 'change') {
+      hideAuthScreen();
+      showToast('Password changed.', 2500);
+    } else {
+      await onSignedIn(data.user);
+      showToast('Password saved. Use it with your email next time.', 3500);
+    }
+  });
+
+  document.getElementById('pwCancel').addEventListener('click', () => {
+    hideSetPassword();
+    hideAuthScreen();
+  });
+}
+
+// mode 'link': arrived from an invite or reset email; 'change': from Settings while signed in
+let pwMode = null;
+function showSetPassword(mode) {
+  pwMode = mode;
+  document.getElementById('authForm').classList.add('hidden');
+  document.getElementById('authFootnote').classList.add('hidden');
+  document.getElementById('pwForm').classList.remove('hidden');
+  document.getElementById('pwCancel').classList.toggle('hidden', mode !== 'change');
+  document.querySelector('.auth-sub').textContent = mode === 'change'
+    ? 'Choose a new password (8+ characters).'
+    : 'Choose a password (8+ characters). You\'ll use it with your email to sign in.';
+  document.getElementById('authMsg').textContent = '';
+  showAuthScreen();
+  document.getElementById('pwNew').focus();
+}
+function hideSetPassword() {
+  pwMode = null;
+  document.getElementById('pwForm').reset();
+  document.getElementById('pwForm').classList.add('hidden');
+  document.getElementById('authForm').classList.remove('hidden');
+  document.getElementById('authFootnote').classList.remove('hidden');
+  document.querySelector('.auth-sub').textContent = 'Sign in to access your team\'s customer map.';
+  document.getElementById('authMsg').textContent = '';
 }
 
 async function onSignedIn(user) {
@@ -766,6 +842,11 @@ function openSettings(firstRun) {
       </div>
     </div>
 
+    <div class="detail-section">
+      <h3>Account</h3>
+      <button class="btn" id="sChangePassword">Change password</button>
+    </div>
+
     ${firstRun ? '' : `
     <div class="detail-section" style="border-top:1px solid #e5e7eb;padding-top:14px;">
       <h3 style="color:#b91c1c;">Danger zone</h3>
@@ -795,6 +876,7 @@ function openSettings(firstRun) {
   document.getElementById('sImportCustomers').addEventListener('click', () => { closeModal(); importCustomersFlow(); });
   document.getElementById('sImportVisits').addEventListener('click', () => { closeModal(); importVisitsFlow(); });
   document.getElementById('sImportZones').addEventListener('click', () => { closeModal(); importZonesFlow(); });
+  document.getElementById('sChangePassword').addEventListener('click', () => { closeModal(); showSetPassword('change'); });
 
   const clearBtn = document.getElementById('sClearAll');
   if (clearBtn) clearBtn.addEventListener('click', async () => {
