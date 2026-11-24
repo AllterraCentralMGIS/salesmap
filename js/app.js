@@ -875,10 +875,13 @@ function closeDetail() {
 }
 
 async function renderDetail(c) {
-  const { data: visits } = await sb
-    .from('visits').select('*')
-    .eq('customer_id', c.id)
-    .order('visit_date', { ascending: false });
+  const [{ data: visits }, { data: dealLinks }] = await Promise.all([
+    sb.from('visits').select('*').eq('customer_id', c.id).order('visit_date', { ascending: false }),
+    // Open HubSpot deals linked to this customer by the daily sync (empty if the tables aren't there)
+    sb.from('hubspot_deal_customers').select('hubspot_deals(*)').eq('customer_id', c.id),
+  ]);
+  const deals = (dealLinks || []).map((r) => r.hubspot_deals).filter((d) => d && d.is_open)
+    .sort((a, b) => (b.amount || 0) - (a.amount || 0));
   const body = document.getElementById('detailBody');
   // Only filled-in fields get a row; geocode quality is internal and stays off the panel
   const row = (label, html) => html ? `<div class="label">${label}</div><div>${html}</div>` : '';
@@ -914,6 +917,12 @@ async function renderDetail(c) {
       ${fields ? `<div class="field-grid">${fields}</div>` : '<div class="empty-state inline">No contact details yet. Use Edit to add some.</div>'}
     </div>
 
+    ${deals.length ? `
+    <div class="detail-section">
+      <h3>Open deals (${deals.length})</h3>
+      ${deals.map(renderDeal).join('')}
+    </div>` : ''}
+
     <div class="detail-section">
       <h3>Visit history (${n})</h3>
       <div id="visitList">
@@ -927,18 +936,38 @@ async function renderDetail(c) {
     if (btn) btn.addEventListener('click', () => deleteVisit(c.id, v.id));
   }
 }
+function renderDeal(d) {
+  const amount = d.amount != null
+    ? Number(d.amount).toLocaleString('en-US', { style: 'currency', currency: d.currency || 'USD', maximumFractionDigits: 0 })
+    : '';
+  return `
+    <a class="deal" href="${escapeAttr(d.url || '#')}" target="_blank" rel="noopener">
+      <div class="deal-head">
+        <div class="deal-name">${escapeHtml(d.name || 'Untitled deal')}</div>
+        ${amount ? `<div class="deal-amount">${escapeHtml(amount)}</div>` : ''}
+      </div>
+      <div class="deal-meta">
+        ${d.stage_label ? `<span class="deal-stage">${escapeHtml(d.stage_label.trim())}</span>` : ''}
+        ${d.close_date ? `<span>Close ${escapeHtml(d.close_date)}</span>` : ''}
+        <span class="deal-link">Open in HubSpot</span>
+      </div>
+    </a>`;
+}
 function renderVisit(v) {
   const by = state.profilesById[v.visitor_id];
   const byLabel = by ? by.display_name : '(unknown)';
+  const fromHubspot = v.source === 'hubspot';
+  const notes = fromHubspot && v.notes ? v.notes.replace(/^HubSpot:\s*/, '') : v.notes;
   return `
     <div class="visit">
       <button class="visit-delete icon-btn" id="del-visit-${v.id}" title="Delete visit" aria-label="Delete visit"><svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg></button>
       <div class="visit-head">
         <div class="visit-date">${escapeHtml(v.visit_date)}</div>
+        ${fromHubspot ? '<div class="visit-source">HubSpot</div>' : ''}
         ${v.outcome ? `<div class="visit-outcome">${escapeHtml(v.outcome)}</div>` : ''}
       </div>
       <div class="visit-by">by ${escapeHtml(byLabel)}</div>
-      ${v.notes ? `<div class="visit-notes">${escapeHtml(v.notes)}</div>` : ''}
+      ${notes ? `<div class="visit-notes">${escapeHtml(notes)}</div>` : ''}
     </div>`;
 }
 

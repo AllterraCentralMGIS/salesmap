@@ -550,6 +550,23 @@ h1, h2, h3 { color: var(--heading); letter-spacing: -0.01em; }
 }
 .visit-delete .icon { width: 16px; height: 16px; }
 .visit-delete:hover { color: var(--danger); }
+.visit-source { font-size: 11px; font-weight: 700; letter-spacing: 0.04em; padding: 1px 8px; border-radius: 999px; background: #ff7a5926; color: #c2410c; }
+[data-theme="dark"] .visit-source { color: #ffb199; }
+
+/* HubSpot deals on the customer card */
+.deal {
+  display: block; text-decoration: none; color: inherit;
+  border: 1px solid var(--border-soft); border-radius: var(--r-md);
+  padding: 10px 12px; margin-bottom: var(--s-2); background: var(--surface-2);
+  transition: border-color 120ms ease, background-color 120ms ease;
+}
+.deal:hover { border-color: var(--at-gold-10); background: var(--surface-3); }
+.deal-head { display: flex; justify-content: space-between; gap: var(--s-2); align-items: baseline; }
+.deal-name { font-weight: 700; color: var(--heading); min-width: 0; }
+.deal-amount { font-weight: 700; color: var(--heading); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.deal-meta { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; margin-top: 6px; font-size: var(--fs-xs); color: var(--text-3); }
+.deal-stage { font-weight: 600; padding: 2px 10px; border-radius: 999px; background: var(--tint); color: var(--tint-text); }
+.deal-link { margin-left: auto; color: var(--link); font-weight: 600; }
 .visit-delete:hover { background: var(--danger-bg); border-color: var(--danger-border); }
 
 /* Modal */
